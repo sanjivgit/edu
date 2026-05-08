@@ -1,0 +1,304 @@
+import type { ModuleConfig, NavItem, UserRole } from '@/types';
+
+// ─── Navigation Groups ──────────────────────────────────────────────────────────
+export const NAV_GROUPS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'academics', label: 'Academics' },
+  { id: 'management', label: 'Management' },
+  { id: 'communication', label: 'Communication' },
+  { id: 'finance', label: 'Finance' },
+  { id: 'media', label: 'Media & Learning' },
+  { id: 'system', label: 'System' },
+] as const;
+
+// ─── Module Configuration ───────────────────────────────────────────────────────
+export const MODULE_CONFIG: ModuleConfig[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: 'LayoutDashboard',
+    basePath: '/dashboard',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'admission',
+    label: 'Admissions',
+    icon: 'UserPlus',
+    basePath: '/admissions',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'teachers',
+    label: 'Teacher Management',
+    icon: 'Users',
+    basePath: '/teachers',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'classes',
+    label: 'Class Management',
+    icon: 'School',
+    basePath: '/classes',
+    roles: ['superadmin', 'admin', 'teacher'],
+    lazy: true,
+  },
+  {
+    id: 'subjects',
+    label: 'Subjects',
+    icon: 'BookOpen',
+    basePath: '/subjects',
+    roles: ['superadmin', 'admin', 'teacher'],
+    lazy: true,
+  },
+  {
+    id: 'timetable',
+    label: 'Timetable',
+    icon: 'CalendarDays',
+    basePath: '/timetable',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    icon: 'ClipboardCheck',
+    basePath: '/attendance',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'homework',
+    label: 'Homework',
+    icon: 'BookMarked',
+    basePath: '/homework',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'assessment',
+    label: 'Assessments',
+    icon: 'PenLine',
+    basePath: '/assessments',
+    roles: ['superadmin', 'admin', 'teacher', 'student'],
+    lazy: true,
+  },
+  {
+    id: 'exam',
+    label: 'Exam Management',
+    icon: 'GraduationCap',
+    basePath: '/exams',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'syllabus',
+    label: 'Syllabus',
+    icon: 'Layers',
+    basePath: '/syllabus',
+    roles: ['superadmin', 'admin', 'teacher', 'student'],
+    lazy: true,
+  },
+  {
+    id: 'fees',
+    label: 'Fee Management',
+    icon: 'CreditCard',
+    basePath: '/fees',
+    roles: ['superadmin', 'admin', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'invoice',
+    label: 'Invoices',
+    icon: 'FileText',
+    basePath: '/invoices',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'transport',
+    label: 'Transportation',
+    icon: 'Bus',
+    basePath: '/transport',
+    roles: ['superadmin', 'admin', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'noticeboard',
+    label: 'Noticeboard',
+    icon: 'Bell',
+    basePath: '/noticeboard',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'diary',
+    label: 'Diary',
+    icon: 'NotebookPen',
+    basePath: '/diary',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'holidays',
+    label: 'Holidays',
+    icon: 'Palmtree',
+    basePath: '/holidays',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'chat',
+    label: 'Messages',
+    icon: 'MessageSquare',
+    basePath: '/chat',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: 'BellRing',
+    basePath: '/notifications',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'live-lecture',
+    label: 'Live Classes',
+    icon: 'Video',
+    basePath: '/live-classes',
+    roles: ['superadmin', 'admin', 'teacher', 'student'],
+    lazy: true,
+  },
+  {
+    id: 'recorded-lecture',
+    label: 'Recorded Lectures',
+    icon: 'PlayCircle',
+    basePath: '/recorded-lectures',
+    roles: ['superadmin', 'admin', 'teacher', 'student'],
+    lazy: true,
+  },
+  {
+    id: 'gallery',
+    label: 'Gallery',
+    icon: 'Image',
+    basePath: '/gallery',
+    roles: ['superadmin', 'admin', 'teacher', 'student', 'parent'],
+    lazy: true,
+  },
+  {
+    id: 'product',
+    label: 'Products',
+    icon: 'Package',
+    basePath: '/products',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: 'BarChart3',
+    basePath: '/reports',
+    roles: ['superadmin', 'admin', 'teacher'],
+    lazy: true,
+  },
+  {
+    id: 'roles',
+    label: 'Roles & Permissions',
+    icon: 'Shield',
+    basePath: '/roles',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'audit-logs',
+    label: 'Audit Logs',
+    icon: 'ScrollText',
+    basePath: '/audit-logs',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: 'Settings',
+    basePath: '/settings',
+    roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+];
+
+// ─── Build nav items for a given role ──────────────────────────────────────────
+export function buildNavItems(role: UserRole): NavItem[] {
+  return MODULE_CONFIG.filter((m) => m.roles.includes(role)).map((m) => ({
+    id: m.id,
+    label: m.label,
+    icon: m.icon,
+    path: m.basePath,
+    roles: m.roles,
+  }));
+}
+
+// ─── NAV groups map ────────────────────────────────────────────────────────────
+export const NAV_GROUP_MAP: Record<string, string> = {
+  dashboard: 'overview',
+  admission: 'management',
+  classes: 'academics',
+  teachers: 'management',
+  subjects: 'academics',
+  timetable: 'academics',
+  attendance: 'academics',
+  homework: 'academics',
+  assessment: 'academics',
+  exam: 'academics',
+  syllabus: 'academics',
+  fees: 'finance',
+  invoice: 'finance',
+  transport: 'management',
+  noticeboard: 'communication',
+  diary: 'communication',
+  holidays: 'management',
+  chat: 'communication',
+  notifications: 'communication',
+  'live-lecture': 'media',
+  'recorded-lecture': 'media',
+  gallery: 'media',
+  product: 'management',
+  reports: 'system',
+  roles: 'system',
+  'audit-logs': 'system',
+  settings: 'system',
+};
+
+// ─── Role Dashboard Paths ───────────────────────────────────────────────────────
+export const ROLE_DASHBOARD_PATHS: Record<UserRole, string> = {
+  superadmin: '/dashboard',
+  admin: '/dashboard',
+  teacher: '/dashboard',
+  student: '/dashboard',
+  parent: '/dashboard',
+};
+
+// ─── Public routes (no auth needed) ───────────────────────────────────────────
+export const PUBLIC_ROUTES = [
+  '/auth/login',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/otp-verify',
+];
+
+// ─── Default pagination ─────────────────────────────────────────────────────────
+export const DEFAULT_PAGE_SIZE = 10;
+export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+// ─── Theme options ─────────────────────────────────────────────────────────────
+export const THEME_OPTIONS = [
+  { value: 'indigo', label: 'Indigo', color: '#4f46e5' },
+  { value: 'emerald', label: 'Emerald', color: '#10b981' },
+  { value: 'rose', label: 'Rose', color: '#f43f5e' },
+  { value: 'amber', label: 'Amber', color: '#f59e0b' },
+  { value: 'cyan', label: 'Cyan', color: '#06b6d4' },
+] as const;
