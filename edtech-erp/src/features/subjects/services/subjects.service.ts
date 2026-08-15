@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findTeacherIdByName, resolveClassId } from '@/features/common/services/lookups.service';
 
 export type SubjectCategory = 'core' | 'language' | 'elective' | 'lab' | 'sports' | 'arts';
 
@@ -18,27 +20,44 @@ export interface SubjectRecord {
 }
 
 const API = '/subjects';
-let subjectStore: SubjectRecord[] = [];
 
-function ensureSeed() {
-  if (subjectStore.length) return;
-  const now = new Date().toISOString();
-  subjectStore = [
-    { id: 'SUB-1', name: 'Mathematics', code: 'MATH-10', category: 'core', classId: '10', weeklyPeriods: 6, teacher: 'Mr. Verma', isActive: true, createdAt: now, updatedAt: now },
-    { id: 'SUB-2', name: 'Science', code: 'SCI-10', category: 'core', classId: '10', weeklyPeriods: 5, teacher: 'Ms. Joshi', isActive: true, createdAt: now, updatedAt: now },
-    { id: 'SUB-3', name: 'English', code: 'ENG-10', category: 'language', classId: '10', weeklyPeriods: 4, teacher: 'Mr. Iyer', isActive: true, createdAt: now, updatedAt: now },
-    { id: 'SUB-4', name: 'Computer', code: 'CS-10', category: 'lab', classId: '10', weeklyPeriods: 2, teacher: 'Mr. Shah', isActive: true, createdAt: now, updatedAt: now },
-    { id: 'SUB-5', name: 'Art', code: 'ART-10', category: 'arts', classId: '10', weeklyPeriods: 1, teacher: 'Ms. Patel', isActive: true, createdAt: now, updatedAt: now },
-  ];
+interface BackendSubject {
+  id: string;
+  name: string;
+  code: string;
+  category: SubjectCategory;
+  weeklyPeriods: number;
+  isActive: boolean;
+  classId: string | null;
+  teacher?: { id: string; fullName: string } | null;
+  teacherId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toSubjectRecord(s: BackendSubject): SubjectRecord {
+  return {
+    id: s.id,
+    name: s.name,
+    code: s.code,
+    category: s.category,
+    classId: s.classId ?? '',
+    weeklyPeriods: s.weeklyPeriods,
+    teacher: s.teacher?.fullName ?? '',
+    isActive: s.isActive,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
 }
 
 export const useGetSubjects = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...subjectStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<ApiResponse<BackendSubject[]>>('/subjects', { params: { limit: 500 } })
+        .then(unwrapApi);
+      return (res ?? []).map(toSubjectRecord).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -46,23 +65,30 @@ export const useGetSubjectById = ({ subjectId }: { subjectId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', subjectId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return subjectStore.find((s) => s.id === subjectId) ?? null;
+      if (!subjectId) return null;
+      const s = await apiClient.get<ApiResponse<BackendSubject>>(`/subjects/${subjectId}`).then(unwrapApi);
+      return toSubjectRecord(s);
     },
     enabled: !!subjectId,
   });
 
 export const useCreateSubject = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<SubjectRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const id = `SUB-${subjectStore.length + 1}`;
-      const now = new Date().toISOString();
-      const created: SubjectRecord = { id, ...body, createdAt: now, updatedAt: now };
-      subjectStore = [created, ...subjectStore];
-      return created;
+  useAppMutation<SubjectRecord, Omit<SubjectRecord, 'id' | 'createdAt' | 'updatedAt'>>({
+    mutationFn: async (body) => {
+      const teacherId = await findTeacherIdByName(body.teacher);
+      const classId = await resolveClassId(body.classId);
+      const created = await apiClient
+        .post<ApiResponse<BackendSubject>>('/subjects', {
+          name: body.name,
+          code: body.code,
+          category: body.category,
+          weeklyPeriods: Number(body.weeklyPeriods) || 4,
+          classId,
+          teacherId,
+          isActive: body.isActive ?? true,
+        })
+        .then(unwrapApi);
+      return toSubjectRecord(created);
     },
     successMsg: 'Subject created successfully',
     errorMsg: 'Failed to create subject',
@@ -70,15 +96,22 @@ export const useCreateSubject = () =>
   });
 
 export const useUpdateSubject = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<SubjectRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = subjectStore.find((s) => s.id === body.id);
-      if (!current) throw new Error('Subject not found');
-      const next: SubjectRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      subjectStore = subjectStore.map((s) => (s.id === body.id ? next : s));
-      return next;
+  useAppMutation<SubjectRecord, { id: string } & Partial<Omit<SubjectRecord, 'id' | 'createdAt'>>>({
+    mutationFn: async (body) => {
+      const teacherId = await findTeacherIdByName(body.teacher);
+      const classId = await resolveClassId(body.classId);
+      const updated = await apiClient
+        .put<ApiResponse<BackendSubject>>(`/subjects/${body.id}`, {
+          name: body.name,
+          code: body.code,
+          category: body.category,
+          weeklyPeriods: body.weeklyPeriods,
+          classId,
+          teacherId,
+          isActive: body.isActive,
+        })
+        .then(unwrapApi);
+      return toSubjectRecord(updated);
     },
     successMsg: 'Subject updated successfully',
     errorMsg: 'Failed to update subject',
@@ -86,15 +119,12 @@ export const useUpdateSubject = () =>
   });
 
 export const useDeleteSubject = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      subjectStore = subjectStore.filter((s) => s.id !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`/subjects/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Subject deleted successfully',
     errorMsg: 'Failed to delete subject',
     invalidateQueryKeys: [[API, 'list']],
   });
-

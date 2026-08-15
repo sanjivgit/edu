@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+# Build output
+dist/
+build/
+# Generated
+*.tsbuildinfo
+# Environment
+.env
+.env.local
+.env.production
+# Logs
+logs/
+*.log
+npm-debug.log*
+# Prisma
+prisma/*.db
+# Uploads
+uploads/*
+!uploads/.gitkeep
+# OS
+.DS_Store
+Thumbs.db
+# IDE
+.vscode/
+.idea/
+# Testing
+coverage/
+.nyc_output/

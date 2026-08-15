@@ -4,11 +4,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Zap, ArrowRight } from 'lucide-react';
-import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { setCredentials } from '@/store/slices/authSlice';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useToast } from '@/hooks';
+import { useLogin } from '../services/auth.service';
 import type { UserRole } from '@/types';
 
 const loginSchema = z.object({
@@ -28,12 +26,10 @@ const DEMO_USERS: { role: UserRole; email: string; name: string }[] = [
 ];
 
 export default function LoginPage() {
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { success } = useToast();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const loginMutation = useLogin();
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard';
 
@@ -42,32 +38,15 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '', tenantCode: '' },
   });
 
-  const onSubmit = async (data: LoginForm) => {
-    setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 900)); // simulate API
-
-    const demoUser = DEMO_USERS.find((u) => u.email === data.email);
-    const role: UserRole = demoUser?.role ?? 'admin';
-    const name = demoUser?.name ?? 'Demo User';
-
-    dispatch(
-      setCredentials({
-        token: 'demo-token-' + Date.now(),
-        user: {
-          id: '1',
-          name,
-          email: data.email,
-          role,
-          tenantId: 'demo-tenant',
-          permissions: ['*'],
-          avatar: undefined,
-        },
-      })
+  const onSubmit = (data: LoginForm) => {
+    loginMutation.mutate(
+      {
+        email: data.email,
+        password: data.password,
+        tenantCode: data.tenantCode || undefined,
+      },
+      { onSuccess: () => navigate(from, { replace: true }) }
     );
-
-    success('Welcome back!', `Logged in as ${name}`);
-    setIsLoading(false);
-    navigate(from, { replace: true });
   };
 
   const loginAs = (email: string) => {
@@ -174,7 +153,7 @@ export default function LoginPage() {
               type="submit"
               className="w-full"
               size="lg"
-              isLoading={isLoading}
+              isLoading={loginMutation.isPending}
               rightIcon={<ArrowRight className="h-4 w-4" />}
             >
               Sign In

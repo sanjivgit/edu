@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findSubjectIdByName, resolveClassDisplayMap, resolveClassId } from '@/features/common/services/lookups.service';
 
 export type AssessmentType = 'quiz' | 'assignment' | 'unit-test' | 'project';
 export type AssessmentStatus = 'draft' | 'published' | 'closed';
@@ -30,58 +32,59 @@ export interface AssessmentResultRow {
 }
 
 const API = '/assessment';
-let assessmentStore: AssessmentRecord[] = [];
-let resultsStore: AssessmentResultRow[] = [];
 
-function ensureSeed() {
-  if (assessmentStore.length) return;
-  const now = new Date().toISOString();
-  const today = new Date().toISOString().split('T')[0];
-  assessmentStore = [
-    {
-      id: 'ASM-1',
-      title: 'Math Quiz - Algebra',
-      type: 'quiz',
-      classId: '10',
-      section: 'A',
-      subject: 'Mathematics',
-      totalMarks: 20,
-      date: today,
-      instructions: 'Attempt all questions. No negative marking.',
-      status: 'published',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'ASM-2',
-      title: 'Science Unit Test - Chapter 3',
-      type: 'unit-test',
-      classId: '10',
-      section: 'A',
-      subject: 'Science',
-      totalMarks: 50,
-      date: today,
-      instructions: '',
-      status: 'draft',
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface BackendAssessment {
+  id: string;
+  title: string;
+  type: AssessmentType;
+  classId: string;
+  className?: string;
+  section: string | null;
+  subjectId: string | null;
+  subject?: { id: string; name: string } | null;
+  subjectName?: string;
+  totalMarks: number;
+  date: string;
+  instructions: string | null;
+  status: AssessmentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
-  resultsStore = [
-    { id: 'RES-1', assessmentId: 'ASM-1', student: 'Aarav Sharma', rollNo: '010', marks: 18, grade: 'A' },
-    { id: 'RES-2', assessmentId: 'ASM-1', student: 'Priya Patel', rollNo: '011', marks: 16, grade: 'A' },
-    { id: 'RES-3', assessmentId: 'ASM-1', student: 'Riya Singh', rollNo: '012', marks: 12, grade: 'B' },
-  ];
+function classDisplay(classId: string, className?: string, classMap?: Map<string, string>): string {
+  const m = (className ?? '').match(/(\d+)/);
+  if (m) return m[1];
+  if (classMap && classMap.size) return classMap.get(classId) ?? classId;
+  return classId;
+}
+
+function toAssessmentRecord(a: BackendAssessment, classMap?: Map<string, string>): AssessmentRecord {
+  return {
+    id: a.id,
+    title: a.title,
+    type: a.type,
+    classId: classDisplay(a.classId, a.className, classMap),
+    section: a.section ?? '',
+    subject: a.subject?.name ?? a.subjectName ?? '',
+    totalMarks: Number(a.totalMarks),
+    date: a.date,
+    instructions: a.instructions ?? '',
+    status: a.status,
+    createdAt: a.createdAt,
+    updatedAt: a.updatedAt,
+  };
 }
 
 export const useGetAssessments = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...assessmentStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendAssessment[] }>>('/assessments', { params: { limit: 500 } })
+        .then(unwrapApi);
+      const items = res?.items ?? [];
+      const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
+      return items.map((i) => toAssessmentRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -89,9 +92,11 @@ export const useGetAssessmentById = ({ assessmentId }: { assessmentId?: string }
   useQuery({
     queryKey: [API, 'detail', assessmentId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return assessmentStore.find((a) => a.id === assessmentId) ?? null;
+      if (!assessmentId) return null;
+      const a = await apiClient
+        .get<ApiResponse<BackendAssessment & { class_?: { name: string } }>>(`/assessments/${assessmentId}`)
+        .then(unwrapApi);
+      return toAssessmentRecord({ ...a, className: a.class_?.name });
     },
     enabled: !!assessmentId,
   });
@@ -100,28 +105,59 @@ export const useGetAssessmentResults = ({ assessmentId }: { assessmentId?: strin
   useQuery({
     queryKey: [API, 'results', assessmentId],
     queryFn: async () => {
-      await mockDelay(140);
-      ensureSeed();
-      return resultsStore.filter((r) => r.assessmentId === assessmentId);
+      if (!assessmentId) return [];
+      const res = await apiClient
+        .get<
+          ApiResponse<
+            Array<{
+              id: string;
+              assessmentId: string;
+              student: string;
+              rollNo: string;
+              marks: number;
+              grade: string;
+            }>
+          >
+        >(`/assessments/${assessmentId}/results`)
+        .then(unwrapApi);
+      return (res ?? []).map((r) => ({ id: r.id, assessmentId: r.assessmentId, student: r.student, rollNo: r.rollNo, marks: r.marks, grade: r.grade }));
     },
     enabled: !!assessmentId,
   });
 
 export const useCreateAssessment = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<AssessmentRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: AssessmentStatus }) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: AssessmentRecord = {
-        id: `ASM-${assessmentStore.length + 1}`,
-        status: body.status ?? 'published',
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      assessmentStore = [created, ...assessmentStore];
-      return created;
+  useAppMutation<
+    AssessmentRecord,
+    {
+      title: string;
+      type: AssessmentType;
+      classId: string;
+      section: string;
+      subject: string;
+      totalMarks: number;
+      date: string;
+      instructions?: string;
+      status?: AssessmentStatus;
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const subjectId = await findSubjectIdByName(body.subject);
+      const created = await apiClient
+        .post<ApiResponse<BackendAssessment>>('/assessments', {
+          title: body.title,
+          type: body.type,
+          classId,
+          section: body.section || undefined,
+          subjectId,
+          totalMarks: Number(body.totalMarks),
+          date: body.date,
+          instructions: body.instructions || undefined,
+          status: body.status ?? 'draft',
+        })
+        .then(unwrapApi);
+      return toAssessmentRecord(created);
     },
     successMsg: 'Assessment created successfully',
     errorMsg: 'Failed to create assessment',
@@ -129,15 +165,39 @@ export const useCreateAssessment = () =>
   });
 
 export const useUpdateAssessment = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<AssessmentRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = assessmentStore.find((a) => a.id === body.id);
-      if (!current) throw new Error('Assessment not found');
-      const next: AssessmentRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      assessmentStore = assessmentStore.map((a) => (a.id === body.id ? next : a));
-      return next;
+  useAppMutation<
+    AssessmentRecord,
+    {
+      id: string;
+      title: string;
+      type: AssessmentType;
+      classId: string;
+      section: string;
+      subject: string;
+      totalMarks: number;
+      date: string;
+      instructions?: string;
+      status: AssessmentStatus;
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const subjectId = await findSubjectIdByName(body.subject);
+      const updated = await apiClient
+        .put<ApiResponse<BackendAssessment>>(`/assessments/${body.id}`, {
+          title: body.title,
+          type: body.type,
+          classId,
+          section: body.section || undefined,
+          subjectId,
+          totalMarks: Number(body.totalMarks),
+          date: body.date,
+          instructions: body.instructions || undefined,
+          status: body.status,
+        })
+        .then(unwrapApi);
+      return toAssessmentRecord(updated);
     },
     successMsg: 'Assessment updated successfully',
     errorMsg: 'Failed to update assessment',
@@ -145,16 +205,12 @@ export const useUpdateAssessment = () =>
   });
 
 export const useDeleteAssessment = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      assessmentStore = assessmentStore.filter((a) => a.id !== body.id);
-      resultsStore = resultsStore.filter((r) => r.assessmentId !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`/assessments/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Assessment deleted successfully',
     errorMsg: 'Failed to delete assessment',
     invalidateQueryKeys: [[API, 'list']],
   });
-

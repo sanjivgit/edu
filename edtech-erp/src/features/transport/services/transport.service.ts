@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
 
 export type TransportRouteStatus = 'active' | 'inactive';
 
@@ -33,61 +34,71 @@ export interface RouteAssignment {
 }
 
 const API = '/transport';
-let routeStore: TransportRoute[] = [];
-let assignmentStore: RouteAssignment[] = [];
 
-function ensureSeed() {
-  if (routeStore.length) return;
-  const now = new Date().toISOString();
-  routeStore = [
-    {
-      id: 'R-1',
-      name: 'Route 1 - North',
-      vehicleNo: 'KA-01-AB-1234',
-      driverName: 'Ramesh Kumar',
-      driverPhone: '9876543210',
-      startsAt: '07:10',
-      stops: [
-        { name: 'Green Park', time: '07:15' },
-        { name: 'City Mall', time: '07:25' },
-        { name: 'Library Circle', time: '07:35' },
-      ],
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'R-2',
-      name: 'Route 2 - South',
-      vehicleNo: 'KA-02-CD-7788',
-      driverName: 'Suresh Singh',
-      driverPhone: '9123456780',
-      startsAt: '07:05',
-      stops: [
-        { name: 'Lake View', time: '07:10' },
-        { name: 'Metro Station', time: '07:20' },
-        { name: 'Market Road', time: '07:30' },
-      ],
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface BackendStop {
+  id: string;
+  name: string;
+  time: string;
+}
 
-  assignmentStore = [
-    { id: 'A-1', routeId: 'R-1', student: 'Aarav Sharma', rollNo: '010', classId: '10', section: 'A', stopName: 'City Mall' },
-    { id: 'A-2', routeId: 'R-1', student: 'Priya Patel', rollNo: '011', classId: '10', section: 'A', stopName: 'Green Park' },
-    { id: 'A-3', routeId: 'R-2', student: 'Riya Singh', rollNo: '012', classId: '10', section: 'A', stopName: 'Metro Station' },
-  ];
+interface BackendRoute {
+  id: string;
+  name: string;
+  vehicleNo: string;
+  driverName: string;
+  driverPhone: string;
+  startsAt: string;
+  status: TransportRouteStatus;
+  stops?: BackendStop[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toTransportRoute(r: BackendRoute): TransportRoute {
+  return {
+    id: r.id,
+    name: r.name,
+    vehicleNo: r.vehicleNo,
+    driverName: r.driverName,
+    driverPhone: r.driverPhone,
+    startsAt: r.startsAt,
+    status: r.status,
+    stops: (r.stops ?? []).map((s) => ({ name: s.name, time: s.time })),
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function toRouteAssignment(a: {
+  id: string;
+  routeId: string;
+  student: string;
+  rollNo: string;
+  classId: string;
+  className?: string;
+  section?: string;
+  stopName: string;
+}): RouteAssignment {
+  const m = (a.className ?? '').match(/(\d+)/);
+  return {
+    id: a.id,
+    routeId: a.routeId,
+    student: a.student,
+    rollNo: a.rollNo,
+    classId: m ? m[1] : a.classId,
+    section: a.section ?? '',
+    stopName: a.stopName,
+  };
 }
 
 export const useGetRoutes = () =>
   useQuery({
     queryKey: [API, 'routes'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...routeStore].sort((a, b) => a.name.localeCompare(b.name));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendRoute[] }>>('/transport/routes', { params: { limit: 500 } })
+        .then(unwrapApi);
+      return (res?.items ?? []).map(toTransportRoute).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 
@@ -95,9 +106,9 @@ export const useGetRouteById = ({ routeId }: { routeId?: string }) =>
   useQuery({
     queryKey: [API, 'routes', routeId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return routeStore.find((r) => r.id === routeId) ?? null;
+      if (!routeId) return null;
+      const res = await apiClient.get<ApiResponse<BackendRoute>>(`/transport/routes/${routeId}`).then(unwrapApi);
+      return res ? toTransportRoute(res) : null;
     },
     enabled: !!routeId,
   });
@@ -106,27 +117,46 @@ export const useGetAssignmentsByRoute = ({ routeId }: { routeId?: string }) =>
   useQuery({
     queryKey: [API, 'assignments', routeId],
     queryFn: async () => {
-      await mockDelay(140);
-      ensureSeed();
-      return assignmentStore.filter((a) => a.routeId === routeId);
+      if (!routeId) return [];
+      const res = await apiClient
+        .get<
+          ApiResponse<
+            Array<{
+              id: string;
+              routeId: string;
+              student: string;
+              rollNo: string;
+              classId: string;
+              className?: string;
+              section?: string;
+              stopName: string;
+            }>
+          >
+        >(`/transport/routes/${routeId}/assignments`)
+        .then(unwrapApi);
+      return (res ?? []).map(toRouteAssignment);
     },
     enabled: !!routeId,
   });
 
 export const useCreateRoute = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<TransportRoute, 'id' | 'createdAt' | 'updatedAt'>) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: TransportRoute = {
-        id: `R-${routeStore.length + 1}`,
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      routeStore = [created, ...routeStore];
-      return created;
+  useAppMutation<
+    TransportRoute,
+    Omit<TransportRoute, 'id' | 'createdAt' | 'updatedAt'>
+  >({
+    mutationFn: async (body) => {
+      const created = await apiClient
+        .post<ApiResponse<BackendRoute>>('/transport/routes', {
+          name: body.name,
+          vehicleNo: body.vehicleNo,
+          driverName: body.driverName,
+          driverPhone: body.driverPhone,
+          startsAt: body.startsAt,
+          status: body.status,
+          stops: body.stops.map((s) => ({ name: s.name, time: s.time })),
+        })
+        .then(unwrapApi);
+      return toTransportRoute(created);
     },
     successMsg: 'Route created successfully',
     errorMsg: 'Failed to create route',
@@ -134,15 +164,23 @@ export const useCreateRoute = () =>
   });
 
 export const useUpdateRoute = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<TransportRoute, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = routeStore.find((r) => r.id === body.id);
-      if (!current) throw new Error('Route not found');
-      const next: TransportRoute = { ...current, ...body, updatedAt: new Date().toISOString() };
-      routeStore = routeStore.map((r) => (r.id === body.id ? next : r));
-      return next;
+  useAppMutation<
+    TransportRoute,
+    { id: string } & Partial<Omit<TransportRoute, 'id' | 'createdAt'>>
+  >({
+    mutationFn: async (body) => {
+      const updated = await apiClient
+        .put<ApiResponse<BackendRoute>>(`/transport/routes/${body.id}`, {
+          name: body.name,
+          vehicleNo: body.vehicleNo,
+          driverName: body.driverName,
+          driverPhone: body.driverPhone,
+          startsAt: body.startsAt,
+          status: body.status,
+          stops: body.stops?.map((s) => ({ name: s.name, time: s.time })) ?? [],
+        })
+        .then(unwrapApi);
+      return toTransportRoute(updated);
     },
     successMsg: 'Route updated successfully',
     errorMsg: 'Failed to update route',
@@ -150,16 +188,12 @@ export const useUpdateRoute = () =>
   });
 
 export const useDeleteRoute = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      routeStore = routeStore.filter((r) => r.id !== body.id);
-      assignmentStore = assignmentStore.filter((a) => a.routeId !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`/transport/routes/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Route deleted successfully',
     errorMsg: 'Failed to delete route',
     invalidateQueryKeys: [[API, 'routes']],
   });
-

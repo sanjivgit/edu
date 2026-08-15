@@ -1,4 +1,5 @@
-import { useAppMutation, useAppQuery } from '@/shared/hooks';
+import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
+import { useAppQuery } from '@/reactQueryConfig/hooks/useAppQuery';
 import { productService, type Product } from '../services/productService';
 
 export const PRODUCT_QUERY_KEYS = {

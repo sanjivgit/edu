@@ -9,6 +9,7 @@ export const NAV_GROUPS = [
   { id: 'finance', label: 'Finance' },
   { id: 'media', label: 'Media & Learning' },
   { id: 'system', label: 'System' },
+  { id: 'billing', label: 'Billing & Subscriptions' },
 ] as const;
 
 // ─── Module Configuration ───────────────────────────────────────────────────────
@@ -35,6 +36,14 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: 'Users',
     basePath: '/teachers',
     roles: ['superadmin', 'admin'],
+    lazy: true,
+  },
+  {
+    id: 'students',
+    label: 'Student Management',
+    icon: 'UserRound',
+    basePath: '/students',
+    roles: ['superadmin', 'admin', 'teacher'],
     lazy: true,
   },
   {
@@ -229,6 +238,47 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     roles: ['superadmin', 'admin'],
     lazy: true,
   },
+  // ── Superadmin: Billing & Subscriptions ────────────────────────────────
+  {
+    id: 'billing',
+    label: 'Billing Overview',
+    icon: 'BarChart3',
+    basePath: '/billing',
+    roles: ['superadmin'],
+    lazy: true,
+  },
+  {
+    id: 'billing-tenants',
+    label: 'Schools',
+    icon: 'Building2',
+    basePath: '/billing/schools',
+    roles: ['superadmin'],
+    lazy: true,
+  },
+  {
+    id: 'billing-subscriptions',
+    label: 'Subscriptions',
+    icon: 'CreditCard',
+    basePath: '/billing/subscriptions',
+    roles: ['superadmin'],
+    lazy: true,
+  },
+  {
+    id: 'billing-plans',
+    label: 'Plans',
+    icon: 'Layers',
+    basePath: '/billing/plans',
+    roles: ['superadmin'],
+    lazy: true,
+  },
+  {
+    id: 'billing-invoices',
+    label: 'Invoices',
+    icon: 'FileText',
+    basePath: '/billing/invoices',
+    roles: ['superadmin'],
+    lazy: true,
+  },
 ];
 
 // ─── Build nav items for a given role ──────────────────────────────────────────
@@ -248,6 +298,7 @@ export const NAV_GROUP_MAP: Record<string, string> = {
   admission: 'management',
   classes: 'academics',
   teachers: 'management',
+  students: 'management',
   subjects: 'academics',
   timetable: 'academics',
   attendance: 'academics',
@@ -271,6 +322,11 @@ export const NAV_GROUP_MAP: Record<string, string> = {
   roles: 'system',
   'audit-logs': 'system',
   settings: 'system',
+  billing: 'billing',
+  'billing-tenants': 'billing',
+  'billing-subscriptions': 'billing',
+  'billing-plans': 'billing',
+  'billing-invoices': 'billing',
 };
 
 // ─── Role Dashboard Paths ───────────────────────────────────────────────────────

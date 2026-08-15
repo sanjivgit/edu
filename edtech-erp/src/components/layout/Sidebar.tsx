@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, UserPlus, School, BookOpen, CalendarDays, ClipboardCheck,
+  LayoutDashboard, UserPlus, UserRound, School, BookOpen, CalendarDays, ClipboardCheck,
   BookMarked, PenLine, GraduationCap, Layers, CreditCard, FileText, Bus,
   Bell, NotebookPen, Palmtree, MessageSquare, BellRing, Video, PlayCircle,
-  Image, BarChart3, Shield, ScrollText, Settings, Package, ChevronDown, ChevronRight,
+  Image, BarChart3, Shield, ScrollText, Settings, Package, Building2, ChevronDown, ChevronRight,
   X, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,10 +13,10 @@ import { buildNavItems, NAV_GROUPS, NAV_GROUP_MAP } from '@/config/modules.confi
 import type { NavItem } from '@/types';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard, UserPlus, School, BookOpen, CalendarDays, ClipboardCheck,
+  LayoutDashboard, UserPlus, UserRound, School, BookOpen, CalendarDays, ClipboardCheck,
   BookMarked, PenLine, GraduationCap, Layers, CreditCard, FileText, Bus,
   Bell, NotebookPen, Palmtree, MessageSquare, BellRing, Video, PlayCircle,
-  Image, BarChart3, Shield, ScrollText, Settings, Package,
+  Image, BarChart3, Shield, ScrollText, Settings, Package, Building2,
 };
 
 function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boolean }) {

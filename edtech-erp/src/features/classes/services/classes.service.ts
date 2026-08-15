@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findTeacherIdByName } from '@/features/common/services/lookups.service';
 
 export interface ClassItem {
   id: string;
@@ -41,37 +43,80 @@ export interface PromotionRecord {
   promotedOn: string;
 }
 
-let classStore: ClassItem[] = [
-  { id: 'CLS-001', name: 'Class 1', code: 'C1', classTeacher: 'Ritika Sharma', sections: 2, students: 56, capacity: 70, status: 'active' },
-  { id: 'CLS-002', name: 'Class 2', code: 'C2', classTeacher: 'Ankit Verma', sections: 3, students: 78, capacity: 90, status: 'active' },
-  { id: 'CLS-003', name: 'Class 3', code: 'C3', classTeacher: 'Sonia Nair', sections: 2, students: 49, capacity: 70, status: 'active' },
-  { id: 'CLS-004', name: 'Class 4', code: 'C4', classTeacher: 'Amit Joshi', sections: 1, students: 0, capacity: 35, status: 'inactive' },
-];
-
-let sectionStore: SectionItem[] = [
-  { id: 'SEC-001', classId: 'CLS-001', className: 'Class 1', name: 'A', roomNo: '101', sectionTeacher: 'Ritika Sharma', students: 28, status: 'active' },
-  { id: 'SEC-002', classId: 'CLS-001', className: 'Class 1', name: 'B', roomNo: '102', sectionTeacher: 'Priya Singh', students: 28, status: 'active' },
-  { id: 'SEC-003', classId: 'CLS-002', className: 'Class 2', name: 'A', roomNo: '201', sectionTeacher: 'Ankit Verma', students: 26, status: 'active' },
-  { id: 'SEC-004', classId: 'CLS-002', className: 'Class 2', name: 'B', roomNo: '202', sectionTeacher: 'Nidhi Rao', students: 27, status: 'active' },
-  { id: 'SEC-005', classId: 'CLS-002', className: 'Class 2', name: 'C', roomNo: '203', sectionTeacher: 'Rohan Das', students: 25, status: 'active' },
-];
-
-let academicYearStore: AcademicYearItem[] = [
-  { id: 'AY-2024', name: '2024-2025', startDate: '2024-04-01', endDate: '2025-03-31', status: 'closed' },
-  { id: 'AY-2025', name: '2025-2026', startDate: '2025-04-01', endDate: '2026-03-31', status: 'active' },
-  { id: 'AY-2026', name: '2026-2027', startDate: '2026-04-01', endDate: '2027-03-31', status: 'planned' },
-];
-
-let promotionStore: PromotionRecord[] = [];
-
 const API = '/classes';
+
+interface BackendClass {
+  id: string;
+  name: string;
+  code: string;
+  capacity: number;
+  status: 'active' | 'inactive';
+  academicYearId?: string | null;
+  studentCount?: number;
+  _count?: { students: number };
+  classTeacher?: { id: string; fullName: string } | null;
+  sections?: Array<{ id: string; name: string; roomNo?: string | null; studentCount?: number; status?: string }>;
+}
+
+interface BackendAcademicYear {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'planned' | 'closed';
+}
+
+function toClassItem(c: BackendClass): ClassItem {
+  return {
+    id: c.id,
+    name: c.name,
+    code: c.code,
+    classTeacher: c.classTeacher?.fullName ?? '',
+    sections: Array.isArray(c.sections) ? c.sections.length : 0,
+    students: c.studentCount ?? c._count?.students ?? 0,
+    capacity: c.capacity,
+    status: c.status,
+  };
+}
+
+function toSectionItem(s: {
+  id: string;
+  classId?: string;
+  className?: string;
+  name: string;
+  roomNo?: string | null;
+  studentCount?: number;
+  sectionTeacher?: string;
+  status?: string;
+}, className: string): SectionItem {
+  return {
+    id: s.id,
+    classId: s.classId ?? '',
+    className: s.className ?? className,
+    name: s.name,
+    roomNo: s.roomNo ?? '',
+    sectionTeacher: s.sectionTeacher ?? '',
+    students: s.studentCount ?? 0,
+    status: (s.status as 'active' | 'inactive') ?? 'active',
+  };
+}
+
+async function fetchClasses(): Promise<BackendClass[]> {
+  const res = await apiClient.get<ApiResponse<BackendClass[]>>('/classes').then(unwrapApi);
+  return Array.isArray(res) ? res : (res as unknown as { items: BackendClass[] }).items ?? [];
+}
+
+async function findClassNameById(classId: string): Promise<string> {
+  const classes = await fetchClasses();
+  return classes.find((c) => c.id === classId)?.name ?? '';
+}
 
 export const useGetClasses = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(200);
-      return [...classStore];
+      const classes = await fetchClasses();
+      return classes.map(toClassItem);
     },
   });
 
@@ -79,8 +124,14 @@ export const useGetSections = () =>
   useQuery({
     queryKey: [API, 'sections'],
     queryFn: async () => {
-      await mockDelay(200);
-      return [...sectionStore];
+      const classes = await fetchClasses();
+      const sections: SectionItem[] = [];
+      for (const c of classes) {
+        for (const s of c.sections ?? []) {
+          sections.push(toSectionItem({ ...s, classId: c.id }, c.name));
+        }
+      }
+      return sections;
     },
   });
 
@@ -88,53 +139,68 @@ export const useGetClassById = ({ classId }: { classId?: string }) =>
   useQuery({
     queryKey: [API, classId],
     queryFn: async () => {
-      await mockDelay(120);
-      return classStore.find((item) => item.id === classId!) ?? null;
+      if (!classId) return null;
+      const c = await apiClient.get<ApiResponse<BackendClass>>(`/classes/${classId}`).then(unwrapApi);
+      return toClassItem(c);
     },
     enabled: !!classId,
   });
 
 export const useAddClass = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<ClassItem, 'id' | 'students' | 'status'>) => {
-      await mockDelay(200);
-      const created: ClassItem = {
-        ...body,
-        id: `CLS-${String(classStore.length + 1).padStart(3, '0')}`,
-        students: 0,
-        status: 'active',
-      };
-      classStore = [...classStore, created];
-      return created;
+  useAppMutation<ClassItem, Omit<ClassItem, 'id' | 'students' | 'status'>>({
+    mutationFn: async (body) => {
+      const classTeacherId = await findTeacherIdByName(body.classTeacher);
+      const created = await apiClient
+        .post<ApiResponse<BackendClass>>('/classes', {
+          name: body.name,
+          code: body.code,
+          capacity: Number(body.capacity) || 40,
+          classTeacherId,
+          status: 'active',
+        })
+        .then(unwrapApi);
+      const extra = Math.max(0, Math.min(25, Number(body.sections || 1) - 1));
+      for (let i = 1; i <= extra; i++) {
+        await apiClient.post('/sections', {
+          classId: created.id,
+          name: String.fromCharCode(65 + i),
+          status: 'active',
+        });
+      }
+      return toClassItem(created);
     },
     successMsg: 'Class created successfully',
     errorMsg: 'Failed to create class',
-    invalidateQueryKeys: [[API, 'list']],
+    invalidateQueryKeys: [[API, 'list'], [API, 'sections']],
   });
 
 export const useEditClass = () =>
-  useAppMutation({
-    mutationFn: async (body: { classId: string; payload: Pick<ClassItem, 'name' | 'code' | 'classTeacher' | 'sections' | 'capacity' | 'status'> }) =>
-      {
-        await mockDelay(200);
-        const { classId, payload } = body;
-        classStore = classStore.map((item) => (item.id === classId ? { ...item, ...payload } : item));
-        sectionStore = sectionStore.map((item) =>
-          item.classId === classId ? { ...item, className: payload.name } : item
-        );
-        return classStore.find((item) => item.id === classId)!;
-      },
+  useAppMutation<
+    ClassItem,
+    { classId: string; payload: Pick<ClassItem, 'name' | 'code' | 'classTeacher' | 'sections' | 'capacity' | 'status'> }
+  >({
+    mutationFn: async ({ classId, payload }) => {
+      const classTeacherId = await findTeacherIdByName(payload.classTeacher);
+      const updated = await apiClient
+        .put<ApiResponse<BackendClass>>(`/classes/${classId}`, {
+          name: payload.name,
+          code: payload.code,
+          capacity: Number(payload.capacity) || undefined,
+          classTeacherId,
+          status: payload.status,
+        })
+        .then(unwrapApi);
+      return toClassItem(updated);
+    },
     successMsg: 'Class updated successfully',
     errorMsg: 'Failed to update class',
     invalidateQueryKeys: [[API, 'list'], [API, 'sections']],
   });
 
 export const useDeleteClass = () =>
-  useAppMutation({
+  useAppMutation<{ id: string }, string>({
     mutationFn: async (classId: string) => {
-      await mockDelay(180);
-      classStore = classStore.filter((item) => item.id !== classId);
-      sectionStore = sectionStore.filter((item) => item.classId !== classId);
+      await apiClient.delete(`/classes/${classId}`);
       return { id: classId };
     },
     successMsg: 'Class deleted successfully',
@@ -143,24 +209,19 @@ export const useDeleteClass = () =>
   });
 
 export const useAddSection = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<SectionItem, 'id' | 'className' | 'status'>) => {
-      await mockDelay(200);
-      const klass = classStore.find((item) => item.id === body.classId);
-      if (!klass) throw new Error('Class not found');
-      const created: SectionItem = {
-        ...body,
-        id: `SEC-${String(sectionStore.length + 1).padStart(3, '0')}`,
-        className: klass.name,
-        status: 'active',
-      };
-      sectionStore = [...sectionStore, created];
-      classStore = classStore.map((item) =>
-        item.id === body.classId
-          ? { ...item, sections: item.sections + 1, students: item.students + body.students }
-          : item
-      );
-      return created;
+  useAppMutation<SectionItem, Omit<SectionItem, 'id' | 'className' | 'status'>>({
+    mutationFn: async (body) => {
+      const sectionTeacherId = await findTeacherIdByName(body.sectionTeacher);
+      const className = await findClassNameById(body.classId);
+      const created = await apiClient
+        .post<ApiResponse<SectionItem>>('/sections', {
+          classId: body.classId,
+          name: body.name,
+          roomNo: body.roomNo || undefined,
+          sectionTeacherId,
+        })
+        .then(unwrapApi);
+      return toSectionItem({ ...created, className }, className);
     },
     successMsg: 'Section created successfully',
     errorMsg: 'Failed to create section',
@@ -168,51 +229,32 @@ export const useAddSection = () =>
   });
 
 export const useEditSection = () =>
-  useAppMutation({
-    mutationFn: async (body: { sectionId: string; payload: Pick<SectionItem, 'classId' | 'name' | 'roomNo' | 'sectionTeacher' | 'students' | 'status'> }) =>
-      {
-        await mockDelay(200);
-        const existing = sectionStore.find((item) => item.id === body.sectionId);
-        if (!existing) throw new Error('Section not found');
-
-        const nextClass = classStore.find((item) => item.id === body.payload.classId);
-        if (!nextClass) throw new Error('Class not found');
-
-        classStore = classStore.map((item) => {
-          if (item.id === existing.classId) {
-            return { ...item, students: Math.max(0, item.students - existing.students), sections: item.sections - (existing.classId === body.payload.classId ? 0 : 1) };
-          }
-          if (item.id === body.payload.classId) {
-            return { ...item, students: item.students + body.payload.students, sections: item.sections + (existing.classId === body.payload.classId ? 0 : 1) };
-          }
-          return item;
-        });
-
-        sectionStore = sectionStore.map((item) =>
-          item.id === body.sectionId
-            ? { ...item, ...body.payload, className: nextClass.name }
-            : item
-        );
-
-        return sectionStore.find((item) => item.id === body.sectionId)!;
-      },
+  useAppMutation<
+    SectionItem,
+    { sectionId: string; payload: Pick<SectionItem, 'classId' | 'name' | 'roomNo' | 'sectionTeacher' | 'students' | 'status'> }
+  >({
+    mutationFn: async ({ sectionId, payload }) => {
+      const sectionTeacherId = await findTeacherIdByName(payload.sectionTeacher);
+      const className = await findClassNameById(payload.classId);
+      const updated = await apiClient
+        .put<ApiResponse<SectionItem>>(`/sections/${sectionId}`, {
+          name: payload.name,
+          roomNo: payload.roomNo || undefined,
+          sectionTeacherId,
+          status: payload.status,
+        })
+        .then(unwrapApi);
+      return toSectionItem({ ...updated, classId: payload.classId, className }, className);
+    },
     successMsg: 'Section updated successfully',
     errorMsg: 'Failed to update section',
     invalidateQueryKeys: [[API, 'list'], [API, 'sections']],
   });
 
 export const useDeleteSection = () =>
-  useAppMutation({
+  useAppMutation<{ id: string }, string>({
     mutationFn: async (sectionId: string) => {
-      await mockDelay(180);
-      const existing = sectionStore.find((item) => item.id === sectionId);
-      if (!existing) return { id: sectionId };
-      sectionStore = sectionStore.filter((item) => item.id !== sectionId);
-      classStore = classStore.map((item) =>
-        item.id === existing.classId
-          ? { ...item, sections: Math.max(0, item.sections - 1), students: Math.max(0, item.students - existing.students) }
-          : item
-      );
+      await apiClient.delete(`/sections/${sectionId}`);
       return { id: sectionId };
     },
     successMsg: 'Section deleted successfully',
@@ -224,22 +266,22 @@ export const useGetAcademicYears = () =>
   useQuery({
     queryKey: [API, 'academic-years'],
     queryFn: async () => {
-      await mockDelay(120);
-      return [...academicYearStore];
+      const res = await apiClient.get<ApiResponse<BackendAcademicYear[]>>('/academic-years').then(unwrapApi);
+      return (res ?? []) as AcademicYearItem[];
     },
   });
 
 export const useCreateAcademicYear = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<AcademicYearItem, 'id' | 'status'>) => {
-      await mockDelay(160);
-      const created: AcademicYearItem = {
-        ...body,
-        id: `AY-${new Date(body.startDate).getFullYear()}`,
-        status: 'planned',
-      };
-      academicYearStore = [created, ...academicYearStore];
-      return created;
+  useAppMutation<AcademicYearItem, Omit<AcademicYearItem, 'id' | 'status'>>({
+    mutationFn: async (body) => {
+      const created = await apiClient
+        .post<ApiResponse<BackendAcademicYear>>('/academic-years', {
+          name: body.name,
+          startDate: body.startDate,
+          endDate: body.endDate,
+        })
+        .then(unwrapApi);
+      return created as AcademicYearItem;
     },
     successMsg: 'Academic year created successfully',
     errorMsg: 'Failed to create academic year',
@@ -247,28 +289,40 @@ export const useCreateAcademicYear = () =>
   });
 
 export const usePromoteStudents = () =>
-  useAppMutation({
-    mutationFn: async (body: { fromClassId: string; toClassId: string; promotedCount: number; academicYearId: string }) => {
-      await mockDelay(180);
-      const from = classStore.find((c) => c.id === body.fromClassId);
-      const to = classStore.find((c) => c.id === body.toClassId);
-      if (!from || !to) throw new Error('Class not found');
-      const count = Math.max(0, Math.min(body.promotedCount, from.students));
-      classStore = classStore.map((c) => {
-        if (c.id === from.id) return { ...c, students: Math.max(0, c.students - count) };
-        if (c.id === to.id) return { ...c, students: c.students + count };
-        return c;
-      });
-      const rec: PromotionRecord = {
-        id: `PROM-${promotionStore.length + 1}`,
-        fromClassId: from.id,
-        toClassId: to.id,
-        promotedCount: count,
+  useAppMutation<
+    PromotionRecord,
+    { fromClassId: string; toClassId: string; promotedCount: number; academicYearId: string }
+  >({
+    mutationFn: async (body) => {
+      let studentIds: string[] | undefined;
+      if (body.promotedCount > 0) {
+        const roster = await apiClient
+          .get<ApiResponse<Array<{ id: string }>>>(`/classes/${body.fromClassId}/students`)
+          .then(unwrapApi);
+        studentIds = roster.slice(0, body.promotedCount).map((s) => s.id);
+      }
+      const res = await apiClient
+        .post<ApiResponse<{
+          mode: string;
+          promotionId: string;
+          promotedCount: number;
+          retainedCount: number;
+          promotion?: { id: string; promotedOn: string };
+        }>>('/classes/promote', {
+          fromClassId: body.fromClassId,
+          toClassId: body.toClassId,
+          academicYearId: body.academicYearId,
+          studentIds,
+        })
+        .then(unwrapApi);
+      return {
+        id: res.promotion?.id ?? res.promotionId,
+        fromClassId: body.fromClassId,
+        toClassId: body.toClassId,
+        promotedCount: res.promotedCount,
         academicYearId: body.academicYearId,
-        promotedOn: new Date().toISOString(),
+        promotedOn: res.promotion?.promotedOn ?? new Date().toISOString(),
       };
-      promotionStore = [rec, ...promotionStore];
-      return rec;
     },
     successMsg: 'Students promoted successfully',
     errorMsg: 'Failed to promote students',
@@ -279,7 +333,25 @@ export const useGetPromotions = () =>
   useQuery({
     queryKey: [API, 'promotions'],
     queryFn: async () => {
-      await mockDelay(120);
-      return [...promotionStore];
+      const res = await apiClient
+        .get<ApiResponse<Array<{
+          id: string;
+          fromClassId: string | null;
+          toClassId: string | null;
+          promotedCount: number;
+          academicYearId: string | null;
+          promotedOn: string;
+        }>>>('/promotions')
+        .then(unwrapApi);
+      return (res ?? [])
+        .filter((p) => p.fromClassId && p.toClassId)
+        .map((p) => ({
+          id: p.id,
+          fromClassId: p.fromClassId as string,
+          toClassId: p.toClassId as string,
+          promotedCount: p.promotedCount,
+          academicYearId: p.academicYearId ?? '',
+          promotedOn: p.promotedOn,
+        }));
     },
   });

@@ -1,15 +1,20 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { store } from '@/store';
 import { logout } from '@/store/slices/authSlice';
 import { addToast } from '@/store/slices/uiSlice';
+import type { ApiResponse } from '@/types';
 
-const BASE_URL = 'https://api.educore.app/v1';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000/v1';
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
+
+export function unwrapApi<T>(response: AxiosResponse<ApiResponse<T>>): T {
+  return response.data.data;
+}
 
 // Request interceptor — attach token
 apiClient.interceptors.request.use(

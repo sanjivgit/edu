@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { mockDelay } from '@/shared/utils';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 
 export type AuditSeverity = 'info' | 'warning' | 'critical';
 
@@ -18,75 +19,59 @@ export interface AuditLogRecord {
 }
 
 const API = '/audit-logs';
-let auditStore: AuditLogRecord[] = [];
 
-function ensureSeed() {
-  if (auditStore.length) return;
-  const now = Date.now();
-  const iso = (ms: number) => new Date(ms).toISOString();
-  auditStore = [
-    {
-      id: 'LOG-1',
-      at: iso(now - 1000 * 60 * 12),
-      actor: 'Admin User',
-      action: 'CREATE',
-      module: 'invoice',
-      entity: 'Invoice',
-      entityId: 'INV-3',
-      ip: '10.0.0.21',
-      severity: 'info',
-      summary: 'Created invoice INV-2026-0003',
-      meta: { amount: 3000, student: 'Riya Singh (012)' },
-    },
-    {
-      id: 'LOG-2',
-      at: iso(now - 1000 * 60 * 30),
-      actor: 'Teacher',
-      action: 'UPDATE',
-      module: 'attendance',
-      entity: 'AttendanceSession',
-      entityId: 'ATT-101',
-      ip: '10.0.0.54',
-      severity: 'info',
-      summary: 'Saved attendance for Class 10-A',
-      meta: { present: 15, absent: 2, late: 1 },
-    },
-    {
-      id: 'LOG-3',
-      at: iso(now - 1000 * 60 * 55),
-      actor: 'System',
-      action: 'FAILED_LOGIN',
-      module: 'auth',
-      entity: 'User',
-      entityId: 'unknown',
-      ip: '172.16.0.9',
-      severity: 'warning',
-      summary: 'Failed login attempt detected',
-      meta: { email: 'unknown@domain.com' },
-    },
-    {
-      id: 'LOG-4',
-      at: iso(now - 1000 * 60 * 90),
-      actor: 'Admin User',
-      action: 'DELETE',
-      module: 'noticeboard',
-      entity: 'Notice',
-      entityId: 'NTC-9',
-      ip: '10.0.0.21',
-      severity: 'critical',
-      summary: 'Deleted notice NTC-9',
-      meta: { reason: 'Duplicate content' },
-    },
-  ];
+interface BackendAuditLogRaw {
+  id: string;
+  actor?: string;
+  action?: string;
+  module?: string;
+  entityId?: string | null;
+  summary?: string;
+  meta?: Record<string, unknown> | null;
+  createdAt?: string;
+}
+
+interface BackendAuditLog {
+  id: string;
+  user: string;
+  action: string;
+  module: string;
+  entityId?: string | null;
+  description: string;
+  metadata?: Record<string, unknown> | null;
+  timestamp: string;
+  createdAt: string;
+}
+
+function toAuditLogRecord(l: BackendAuditLog): AuditLogRecord {
+  return {
+    id: l.id,
+    at: l.timestamp ?? l.createdAt,
+    actor: l.user,
+    action: l.action,
+    module: l.module,
+    entityId: l.entityId ?? undefined,
+    ip: '',
+    severity: 'info',
+    summary: l.description,
+    meta: l.metadata ?? {},
+  };
 }
 
 export const useGetAuditLogs = ({ filters }: { filters: { fromDate?: string; toDate?: string; actor?: string; action?: string; module?: string; severity?: string } }) =>
   useQuery({
     queryKey: [API, 'list', filters],
     queryFn: async () => {
-      await mockDelay(180);
-      ensureSeed();
       const f = filters ?? {};
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendAuditLog[] }>>(API, {
+          params: {
+            limit: 500,
+            ...(f.module ? { module: f.module } : {}),
+          },
+        })
+        .then(unwrapApi);
+
       const from = f.fromDate ? new Date(f.fromDate).getTime() : -Infinity;
       const to = f.toDate ? new Date(f.toDate).getTime() + 1000 * 60 * 60 * 24 : Infinity;
       const actor = (f.actor ?? '').toLowerCase();
@@ -94,7 +79,10 @@ export const useGetAuditLogs = ({ filters }: { filters: { fromDate?: string; toD
       const module = (f.module ?? '').toLowerCase();
       const severity = (f.severity ?? '').toLowerCase();
 
-      return auditStore
+      const items = Array.isArray(res) ? res : res?.items ?? [];
+
+      return items
+        .map(toAuditLogRecord)
         .filter((l) => {
           const at = new Date(l.at).getTime();
           if (at < from || at > to) return false;
@@ -112,10 +100,22 @@ export const useGetAuditLogById = ({ logId }: { logId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', logId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return auditStore.find((l) => l.id === logId) ?? null;
+      if (!logId) return null;
+      const raw = await apiClient
+        .get<ApiResponse<BackendAuditLogRaw>>(`${API}/${logId}`)
+        .then(unwrapApi);
+      if (!raw) return null;
+      return toAuditLogRecord({
+        id: raw.id,
+        user: raw.actor ?? '',
+        action: raw.action ?? '',
+        module: raw.module ?? '',
+        entityId: raw.entityId,
+        description: raw.summary ?? '',
+        metadata: raw.meta ?? {},
+        timestamp: raw.createdAt ?? '',
+        createdAt: raw.createdAt ?? '',
+      });
     },
     enabled: !!logId,
   });
-

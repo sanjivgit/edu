@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from './useAppDispatch';
 import { logout } from '@/store/slices/authSlice';
 import { addToast } from '@/store/slices/uiSlice';
 import { setColorMode, setThemeVariant, toggleSidebar } from '@/store/slices/themeSlice';
+import { authService } from '@/features/auth/services/auth.service';
 import type { ColorMode, ThemeVariant, UserRole, Toast } from '@/types';
 
 // ─── Auth Hook ──────────────────────────────────────────────────────────────────
@@ -11,6 +12,10 @@ export function useAuth() {
   const { user, token, isAuthenticated, isLoading } = useAppSelector((s) => s.auth);
 
   const handleLogout = useCallback(() => {
+    const refreshToken = localStorage.getItem('refresh_token') ?? undefined;
+    authService.logout(refreshToken).catch(() => {
+      // Ignore network errors — local session is cleared regardless
+    });
     dispatch(logout());
   }, [dispatch]);
 

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
 
 export type PermissionAction = 'view' | 'create' | 'edit' | 'delete' | 'approve' | 'export';
 
@@ -39,64 +40,37 @@ export const PERMISSION_MODULES: Array<{ module: string; label: string; actions:
 ];
 
 const API = '/roles';
-let roleStore: RoleRecord[] = [];
 
-function ensureSeed() {
-  if (roleStore.length) return;
-  const now = new Date().toISOString();
-  roleStore = [
-    {
-      id: 'ROLE-1',
-      name: 'Admin',
-      description: 'Full access to all modules',
-      isActive: true,
-      permissions: PERMISSION_MODULES.map((m) => ({ module: m.module, actions: [...m.actions] })),
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'ROLE-2',
-      name: 'Teacher',
-      description: 'Academic modules access',
-      isActive: true,
-      permissions: [
-        { module: 'dashboard', actions: ['view'] },
-        { module: 'attendance', actions: ['view', 'create', 'edit'] },
-        { module: 'timetable', actions: ['view'] },
-        { module: 'subjects', actions: ['view'] },
-        { module: 'homework', actions: ['view', 'create', 'edit'] },
-        { module: 'assessment', actions: ['view', 'create', 'edit'] },
-        { module: 'exam', actions: ['view'] },
-        { module: 'noticeboard', actions: ['view'] },
-        { module: 'notifications', actions: ['view'] },
-      ],
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'ROLE-3',
-      name: 'Accountant',
-      description: 'Fees and invoice management',
-      isActive: true,
-      permissions: [
-        { module: 'dashboard', actions: ['view'] },
-        { module: 'fees', actions: ['view', 'create', 'edit', 'export'] },
-        { module: 'invoice', actions: ['view', 'create', 'edit', 'export'] },
-        { module: 'reports', actions: ['view', 'export'] },
-      ],
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface BackendRole {
+  id: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  permissions: RolePermission[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toRoleRecord(r: BackendRole): RoleRecord {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? '',
+    isActive: r.isActive,
+    permissions: r.permissions ?? [],
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
 }
 
 export const useGetRoles = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...roleStore].sort((a, b) => a.name.localeCompare(b.name));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendRole[] }>>(API, { params: { limit: 500 } })
+        .then(unwrapApi);
+      return (res?.items ?? []).map(toRoleRecord).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 
@@ -104,27 +78,28 @@ export const useGetRoleById = ({ roleId }: { roleId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', roleId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return roleStore.find((r) => r.id === roleId) ?? null;
+      if (!roleId) return null;
+      const r = await apiClient.get<ApiResponse<BackendRole>>(`${API}/${roleId}`).then(unwrapApi);
+      return r ? toRoleRecord(r) : null;
     },
     enabled: !!roleId,
   });
 
 export const useCreateRole = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<RoleRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: RoleRecord = {
-        id: `ROLE-${roleStore.length + 1}`,
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      roleStore = [created, ...roleStore];
-      return created;
+  useAppMutation<
+    RoleRecord,
+    Omit<RoleRecord, 'id' | 'createdAt' | 'updatedAt'>
+  >({
+    mutationFn: async (body) => {
+      const created = await apiClient
+        .post<ApiResponse<BackendRole>>(API, {
+          name: body.name,
+          description: body.description ?? '',
+          isActive: body.isActive,
+          permissions: body.permissions,
+        })
+        .then(unwrapApi);
+      return toRoleRecord(created);
     },
     successMsg: 'Role created successfully',
     errorMsg: 'Failed to create role',
@@ -132,15 +107,20 @@ export const useCreateRole = () =>
   });
 
 export const useUpdateRole = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<RoleRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = roleStore.find((r) => r.id === body.id);
-      if (!current) throw new Error('Role not found');
-      const next: RoleRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      roleStore = roleStore.map((r) => (r.id === body.id ? next : r));
-      return next;
+  useAppMutation<
+    RoleRecord,
+    { id: string } & Partial<Omit<RoleRecord, 'id' | 'createdAt'>>
+  >({
+    mutationFn: async (body) => {
+      const updated = await apiClient
+        .put<ApiResponse<BackendRole>>(`${API}/${body.id}`, {
+          name: body.name,
+          description: body.description ?? '',
+          isActive: body.isActive,
+          permissions: body.permissions ?? [],
+        })
+        .then(unwrapApi);
+      return toRoleRecord(updated);
     },
     successMsg: 'Role updated successfully',
     errorMsg: 'Failed to update role',
@@ -148,15 +128,12 @@ export const useUpdateRole = () =>
   });
 
 export const useDeleteRole = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      roleStore = roleStore.filter((r) => r.id !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`${API}/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Role deleted successfully',
     errorMsg: 'Failed to delete role',
     invalidateQueryKeys: [[API, 'list']],
   });
-

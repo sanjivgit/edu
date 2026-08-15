@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findStudentIdByName } from '@/features/common/services/lookups.service';
 
 export type FeeStatus = 'paid' | 'pending' | 'overdue';
 export type FeeType = 'tuition' | 'transport' | 'lab' | 'library' | 'exam';
@@ -8,6 +10,7 @@ export type PaymentMode = 'cash' | 'online' | 'cheque' | 'dd';
 
 export interface FeeRecord {
   id: string;
+  studentId?: string;
   studentName: string;
   rollNo: string;
   className: string;
@@ -23,27 +26,49 @@ export interface FeeRecord {
 
 const API = '/fees';
 
-let feeStore: FeeRecord[] = Array.from({ length: 32 }, (_, i) => ({
-  id: `FEE-${2000 + i}`,
-  studentName: ['Aarav Sharma','Priya Patel','Riya Singh','Arjun Kumar','Sneha Gupta','Rahul Verma','Kavya Nair','Vikram Mehta'][i % 8],
-  rollNo: `${(i % 12) + 1}${String(i + 1).padStart(3,'0')}`,
-  className: `Class ${(i % 12) + 1}`,
-  feeType: ['tuition','transport','lab','library','exam'][i % 5] as FeeType,
-  amount: [5000,1500,800,500,1200][i % 5],
-  dueDate: new Date(2026, 3, 10).toISOString().split('T')[0],
-  paidDate: i % 3 !== 0 ? new Date(2026, 3, (i % 9) + 1).toISOString().split('T')[0] : undefined,
-  status: (['paid','paid','pending','overdue','paid'][i % 5] as FeeStatus),
-  receiptNo: i % 3 !== 0 ? `RCP-${3000 + i}` : undefined,
-  paymentMode: i % 3 !== 0 ? (['cash','online','cheque','dd'][i % 4] as PaymentMode) : undefined,
-  referenceId: i % 3 !== 0 ? `TXN-${9000 + i}` : undefined,
-}));
+interface BackendPayment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  rollNo: string;
+  className: string;
+  feeType: string;
+  amount: number | string;
+  dueDate?: string;
+  paidDate?: string;
+  status: FeeStatus;
+  receiptNo?: string;
+  paymentMode?: PaymentMode;
+  mode?: PaymentMode;
+  referenceId?: string;
+}
+
+function toFeeRecord(p: BackendPayment): FeeRecord {
+  return {
+    id: p.id,
+    studentId: p.studentId,
+    studentName: p.studentName,
+    rollNo: p.rollNo,
+    className: p.className ?? '',
+    feeType: (p.feeType ?? 'other') as FeeType,
+    amount: Number(p.amount),
+    dueDate: p.dueDate ?? new Date().toISOString().split('T')[0],
+    paidDate: p.paidDate,
+    status: p.status,
+    receiptNo: p.receiptNo,
+    paymentMode: p.paymentMode ?? p.mode,
+    referenceId: p.referenceId,
+  };
+}
 
 export const useGetFees = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(200);
-      return [...feeStore];
+      const res = await apiClient
+        .get<ApiResponse<BackendPayment[]>>('/fees/payments', { params: { limit: 500 } })
+        .then(unwrapApi);
+      return (res ?? []).map(toFeeRecord);
     },
   });
 
@@ -51,36 +76,87 @@ export const useGetFeeById = ({ feeId }: { feeId?: string }) =>
   useQuery({
     queryKey: [API, feeId],
     queryFn: async () => {
-      await mockDelay(120);
-      return feeStore.find((f) => f.id === feeId) ?? null;
+      if (!feeId) return null;
+      const res = await apiClient
+        .get<ApiResponse<{
+          id: string;
+          student: { id: string; name: string; rollNo: string };
+          fee: { type: FeeType; dueDate?: string } | null;
+          amount: number | string;
+          paidDate?: string;
+          status: FeeStatus;
+          receiptNo?: string;
+          mode?: PaymentMode;
+          referenceId?: string;
+        }>>(`/fees/payments/${feeId}`)
+        .then(unwrapApi);
+      return toFeeRecord({
+        id: res.id,
+        studentId: res.student.id,
+        studentName: res.student.name,
+        rollNo: res.student.rollNo,
+        className: '',
+        feeType: res.fee?.type ?? 'other',
+        amount: res.amount,
+        dueDate: res.fee?.dueDate,
+        paidDate: res.paidDate,
+        status: res.status,
+        receiptNo: res.receiptNo,
+        paymentMode: res.mode,
+        referenceId: res.referenceId,
+      });
     },
     enabled: !!feeId,
   });
 
 export const useRecordPayment = () =>
-  useAppMutation({
-    mutationFn: async (body: {
+  useAppMutation<
+    FeeRecord,
+    {
       feeId: string;
       paymentMode: PaymentMode;
       paymentDate: string;
       referenceId?: string;
       amount?: number;
-    }) => {
-      await mockDelay(200);
-      feeStore = feeStore.map((f) =>
-        f.id === body.feeId
-          ? {
-              ...f,
-              status: 'paid',
-              paidDate: body.paymentDate,
-              receiptNo: f.receiptNo ?? `RCP-${Math.floor(3000 + Math.random() * 4000)}`,
-              paymentMode: body.paymentMode,
-              referenceId: body.referenceId,
-              amount: body.amount ?? f.amount,
+    }
+  >({
+    mutationFn: async (body) => {
+      const existing = await apiClient
+        .get<ApiResponse<{ studentId: string; feeId: string | null }>>(`/fees/payments/${body.feeId}`)
+        .then(unwrapApi);
+      const res = await apiClient
+        .post<
+          ApiResponse<
+            BackendPayment & {
+              student?: { name: string; rollNo: string };
+              fee?: { type: FeeType; dueDate?: string } | null;
+              mode?: PaymentMode;
             }
-          : f
-      );
-      return feeStore.find((f) => f.id === body.feeId)!;
+          >
+        >('/fees/payments', {
+          studentId: existing.studentId,
+          feeId: existing.feeId ?? undefined,
+          amount: body.amount,
+          paidDate: body.paymentDate,
+          mode: body.paymentMode,
+          referenceId: body.referenceId,
+        })
+        .then(unwrapApi);
+      return toFeeRecord({
+        id: res.id,
+        studentId: res.studentId,
+        studentName: res.student?.name ?? res.studentName,
+        rollNo: res.student?.rollNo ?? res.rollNo,
+        className: res.className ?? '',
+        feeType: res.fee?.type ?? res.feeType,
+        amount: res.amount,
+        dueDate: res.fee?.dueDate ?? res.dueDate,
+        paidDate: res.paidDate,
+        status: res.status,
+        receiptNo: res.receiptNo,
+        paymentMode: res.mode ?? res.paymentMode,
+        referenceId: res.referenceId,
+      });
     },
     successMsg: 'Payment recorded successfully',
     errorMsg: 'Failed to record payment',
@@ -88,32 +164,56 @@ export const useRecordPayment = () =>
   });
 
 export const useCreateFeeAndRecordPayment = () =>
-  useAppMutation({
-    mutationFn: async (body: {
+  useAppMutation<
+    FeeRecord,
+    {
       student: string;
       feeType: FeeType;
       amount: number;
       paymentMode: PaymentMode;
       paymentDate: string;
       referenceId?: string;
-    }) => {
-      await mockDelay(200);
-      const created: FeeRecord = {
-        id: `FEE-${2000 + feeStore.length}`,
-        studentName: body.student,
-        rollNo: body.student.replace(/\s+/g, '').slice(0, 5).toUpperCase(),
-        className: 'Class 10',
-        feeType: body.feeType,
-        amount: body.amount,
-        dueDate: body.paymentDate,
-        paidDate: body.paymentDate,
+    }
+  >({
+    mutationFn: async (body) => {
+      const studentId = await findStudentIdByName(body.student);
+      if (!studentId) throw new Error('Student not found. Use a registered student name or roll number.');
+      const res = await apiClient
+        .post<ApiResponse<{
+          payment: {
+            id: string;
+            amount: number | string;
+            paidDate: string;
+            mode: PaymentMode;
+            receiptNo: string;
+            referenceId?: string;
+          };
+          fee: { type: FeeType };
+          student: { id: string; name: string; rollNo: string; className: string };
+        }>>('/fees/payments/create-fee', {
+          studentId,
+          feeType: body.feeType,
+          amount: body.amount,
+          paymentMode: body.paymentMode,
+          paymentDate: body.paymentDate,
+          referenceId: body.referenceId,
+        })
+        .then(unwrapApi);
+      return {
+        id: res.payment.id,
+        studentId: res.student.id,
+        studentName: res.student.name,
+        rollNo: res.student.rollNo,
+        className: res.student.className,
+        feeType: res.fee.type,
+        amount: Number(res.payment.amount),
+        dueDate: res.payment.paidDate ?? new Date().toISOString().split('T')[0],
+        paidDate: res.payment.paidDate,
         status: 'paid',
-        receiptNo: `RCP-${3000 + feeStore.length}`,
-        paymentMode: body.paymentMode,
-        referenceId: body.referenceId,
+        receiptNo: res.payment.receiptNo,
+        paymentMode: res.payment.mode,
+        referenceId: res.payment.referenceId,
       };
-      feeStore = [created, ...feeStore];
-      return created;
     },
     successMsg: 'Payment recorded successfully',
     errorMsg: 'Failed to record payment',

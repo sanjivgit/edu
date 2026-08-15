@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { resolveClassId } from '@/features/common/services/lookups.service';
 
 export type DiaryVisibility = 'students' | 'parents' | 'both';
 export type DiaryStatus = 'draft' | 'published';
@@ -22,54 +24,57 @@ export interface DiaryEntry {
 }
 
 const API = '/diary';
-let diaryStore: DiaryEntry[] = [];
 
-function ensureSeed() {
-  if (diaryStore.length) return;
-  const now = new Date().toISOString();
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString().split('T')[0];
-  diaryStore = [
-    {
-      id: 'DY-1',
-      date: yesterday,
-      classId: '10',
-      section: 'A',
-      subject: 'Mathematics',
-      author: 'Mr. Verma',
-      title: 'Algebra recap',
-      content: 'Today we revised algebraic identities and solved practice problems.',
-      visibility: 'both',
-      status: 'published',
-      tags: ['algebra', 'revision'],
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'DY-2',
-      date: today,
-      classId: '10',
-      section: 'A',
-      subject: 'Science',
-      author: 'Ms. Joshi',
-      title: 'Lab safety notes',
-      content: 'Reminder: wear lab coat and follow safety rules during experiments.',
-      visibility: 'students',
-      status: 'draft',
-      tags: ['lab'],
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface BackendDiaryEntry {
+  id: string;
+  date: string;
+  classId: string;
+  className?: string;
+  section: string | null;
+  subject: string;
+  author?: { id: string; name: string } | null;
+  title: string;
+  content: string;
+  visibility: DiaryVisibility;
+  status: DiaryStatus;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toDateString(value?: string): string {
+  return (value ?? '').split('T')[0];
+}
+
+function toDiaryEntry(d: BackendDiaryEntry): DiaryEntry {
+  const m = (d.className ?? '').match(/(\d+)/);
+  return {
+    id: d.id,
+    date: toDateString(d.date),
+    classId: m ? m[1] : d.classId,
+    section: d.section ?? '',
+    subject: d.subject,
+    author: d.author?.name ?? '',
+    title: d.title,
+    content: d.content,
+    visibility: d.visibility,
+    status: d.status,
+    tags: d.tags ?? [],
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt,
+  };
 }
 
 export const useGetDiaryEntries = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...diaryStore].sort((a, b) => b.date.localeCompare(a.date));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendDiaryEntry[] }>>(API, { params: { limit: 500 } })
+        .then(unwrapApi);
+      return (res?.items ?? [])
+        .map(toDiaryEntry)
+        .sort((a, b) => b.date.localeCompare(a.date));
     },
   });
 
@@ -77,28 +82,35 @@ export const useGetDiaryEntryById = ({ entryId }: { entryId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', entryId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return diaryStore.find((d) => d.id === entryId) ?? null;
+      if (!entryId) return null;
+      const d = await apiClient.get<ApiResponse<BackendDiaryEntry>>(`${API}/${entryId}`).then(unwrapApi);
+      return toDiaryEntry(d);
     },
     enabled: !!entryId,
   });
 
 export const useCreateDiaryEntry = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<DiaryEntry, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: DiaryStatus }) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: DiaryEntry = {
-        id: `DY-${diaryStore.length + 1}`,
-        status: body.status ?? 'published',
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      diaryStore = [created, ...diaryStore];
-      return created;
+  useAppMutation<
+    DiaryEntry,
+    Omit<DiaryEntry, 'id' | 'author' | 'status' | 'createdAt' | 'updatedAt'> & { status?: DiaryStatus }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const created = await apiClient
+        .post<ApiResponse<BackendDiaryEntry>>(API, {
+          date: body.date,
+          classId,
+          section: body.section || undefined,
+          subject: body.subject,
+          title: body.title,
+          content: body.content,
+          visibility: body.visibility,
+          status: body.status ?? 'published',
+          tags: body.tags ?? [],
+        })
+        .then(unwrapApi);
+      return toDiaryEntry(created);
     },
     successMsg: 'Diary entry created successfully',
     errorMsg: 'Failed to create diary entry',
@@ -106,15 +118,27 @@ export const useCreateDiaryEntry = () =>
   });
 
 export const useUpdateDiaryEntry = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<DiaryEntry, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = diaryStore.find((d) => d.id === body.id);
-      if (!current) throw new Error('Diary entry not found');
-      const next: DiaryEntry = { ...current, ...body, updatedAt: new Date().toISOString() };
-      diaryStore = diaryStore.map((d) => (d.id === body.id ? next : d));
-      return next;
+  useAppMutation<
+    DiaryEntry,
+    { id: string } & Partial<Omit<DiaryEntry, 'id' | 'author' | 'createdAt'>>
+  >({
+    mutationFn: async (body) => {
+      const classId = body.classId ? await resolveClassId(body.classId) : undefined;
+      if (body.classId && !classId) throw new Error('Class not found');
+      const updated = await apiClient
+        .put<ApiResponse<BackendDiaryEntry>>(`${API}/${body.id}`, {
+          date: body.date,
+          classId,
+          section: body.section || undefined,
+          subject: body.subject,
+          title: body.title,
+          content: body.content,
+          visibility: body.visibility,
+          status: body.status,
+          tags: body.tags ?? [],
+        })
+        .then(unwrapApi);
+      return toDiaryEntry(updated);
     },
     successMsg: 'Diary entry updated successfully',
     errorMsg: 'Failed to update diary entry',
@@ -122,11 +146,9 @@ export const useUpdateDiaryEntry = () =>
   });
 
 export const useDeleteDiaryEntry = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      diaryStore = diaryStore.filter((d) => d.id !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`${API}/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Diary entry deleted successfully',
@@ -135,18 +157,12 @@ export const useDeleteDiaryEntry = () =>
   });
 
 export const usePublishDiaryEntry = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(180);
-      ensureSeed();
-      const current = diaryStore.find((d) => d.id === body.id);
-      if (!current) throw new Error('Diary entry not found');
-      const next: DiaryEntry = { ...current, status: 'published', updatedAt: new Date().toISOString() };
-      diaryStore = diaryStore.map((d) => (d.id === body.id ? next : d));
-      return next;
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.patch(`${API}/${body.id}/publish`);
+      return { id: body.id };
     },
     successMsg: 'Diary entry published',
     errorMsg: 'Failed to publish diary entry',
     invalidateQueryKeys: [[API, 'list'], [API, 'detail']],
   });
-

@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Mail, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks';
+import { authService } from '../services/auth.service';
 
 // ─── Shared Auth Layout ─────────────────────────────────────────────────────────
 function AuthCard({ children, title, description }: {
@@ -47,7 +48,7 @@ const forgotSchema = z.object({
 
 export function ForgotPasswordPageComponent() {
   const navigate = useNavigate();
-  const { success } = useToast();
+  const { success, error } = useToast();
   const [sent, setSent] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
@@ -55,10 +56,14 @@ export function ForgotPasswordPageComponent() {
   });
 
   const onSubmit = async ({ email }: { email: string } | any) => {
-    await new Promise((r) => setTimeout(r, 800));
-    success('OTP Sent', `Check your inbox at ${email}`);
-    setSent(true);
-    setTimeout(() => navigate('/auth/otp-verify', { state: { email } }), 1200);
+    try {
+      const res = await authService.forgotPassword(email);
+      success('OTP Sent', res.message ?? `Check your inbox at ${email}`);
+      setSent(true);
+      setTimeout(() => navigate('/auth/otp-verify', { state: { email, purpose: 'reset-password' } }), 1200);
+    } catch {
+      error('Failed', 'Something went wrong sending the OTP.');
+    }
   };
 
   return (
@@ -95,9 +100,12 @@ export function ForgotPasswordPageComponent() {
 // ─── OTP Verify ─────────────────────────────────────────────────────────────────
 export function OtpVerifyPageComponent() {
   const navigate = useNavigate();
-  const { success } = useToast();
+  const location = useLocation();
+  const { success, error } = useToast();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+
+  const email = (location.state as { email?: string } | null)?.email ?? '';
 
   const handleChange = (idx: number, val: string) => {
     if (!/^\d?$/.test(val)) return;
@@ -116,12 +124,22 @@ export function OtpVerifyPageComponent() {
   };
 
   const handleVerify = async () => {
-    if (otp.join('').length < 6) return;
+    const code = otp.join('');
+    if (code.length < 6) return;
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    success('OTP Verified', 'You can now reset your password');
-    navigate('/auth/reset-password');
+    // The backend validates the OTP inside reset-password, so pass it along.
+    await new Promise((r) => setTimeout(r, 400));
     setIsLoading(false);
+    navigate('/auth/reset-password', { state: { email, otp: code } });
+  };
+
+  const handleResend = async () => {
+    try {
+      await authService.resendOtp({ email, purpose: 'reset-password' });
+      success('OTP Sent', 'A new OTP has been sent to your email.');
+    } catch {
+      error('Failed', 'Could not resend the OTP.');
+    }
   };
 
   return (
@@ -152,7 +170,9 @@ export function OtpVerifyPageComponent() {
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           Didn't receive it?{' '}
-          <button className="text-primary hover:underline font-medium">Resend OTP</button>
+          <button className="text-primary hover:underline font-medium" onClick={handleResend}>
+            Resend OTP
+          </button>
         </p>
       </div>
     </AuthCard>
@@ -172,16 +192,30 @@ const resetSchema = z
 
 export function ResetPasswordPageComponent() {
   const navigate = useNavigate();
-  const { success } = useToast();
+  const location = useLocation();
+  const { success, error } = useToast();
+
+  const email = (location.state as { email?: string } | null)?.email ?? '';
+  const otp = (location.state as { otp?: string } | null)?.otp ?? '';
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(resetSchema),
   });
 
-  const onSubmit = async () => {
-    await new Promise((r) => setTimeout(r, 800));
-    success('Password Reset', 'Your password has been updated successfully');
-    navigate('/auth/login');
+  const onSubmit = async (values: { password: string } | any) => {
+    if (!email || !otp) {
+      error('Missing details', 'Please restart the reset process.');
+      navigate('/auth/forgot-password');
+      return;
+    }
+    try {
+      await authService.resetPassword({ email, otp, newPassword: values.password });
+      success('Password Reset', 'Your password has been updated successfully');
+      setTimeout(() => navigate('/auth/login'), 1200);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      error('Reset failed', msg ?? 'Something went wrong resetting the password.');
+    }
   };
 
   return (

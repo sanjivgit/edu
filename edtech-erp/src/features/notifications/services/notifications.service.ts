@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import { useToast } from '@/hooks';
+import type { ApiResponse } from '@/types';
 
 export type NotificationChannel = 'in-app' | 'email' | 'sms' | 'whatsapp';
 export type NotificationPriority = 'low' | 'normal' | 'high';
@@ -22,140 +23,185 @@ export interface NotificationRecord {
   updatedAt: string;
 }
 
-const API = '/notifications';
-let notifStore: NotificationRecord[] = [];
+// ─── Backend wire types & mapping ───────────────────────────────────────────────
 
-function ensureSeed() {
-  if (notifStore.length) return;
-  const now = new Date().toISOString();
-  const today = new Date().toISOString().split('T')[0];
-  notifStore = [
-    {
-      id: 'N-1',
-      title: 'Welcome to EduCore',
-      message: 'Your dashboard is ready. Explore modules and start managing your campus.',
-      channel: 'in-app',
-      priority: 'normal',
-      audience: 'all',
-      scheduleAt: '',
-      status: 'sent',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'N-2',
-      title: 'Fee Reminder',
-      message: 'Please complete fee payment by the due date to avoid late fee.',
-      channel: 'sms',
-      priority: 'high',
-      audience: 'parents',
-      scheduleAt: today,
-      status: 'queued',
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'N-3',
-      title: 'Class 10A: Homework Posted',
-      message: 'New homework has been assigned for Mathematics. Check details in Homework module.',
-      channel: 'in-app',
-      priority: 'normal',
-      audience: 'class',
-      classId: '10',
-      section: 'A',
-      scheduleAt: '',
-      status: 'sent',
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface ApiNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  channel: 'in_app' | 'email' | 'sms' | 'whatsapp';
+  priority: NotificationPriority;
+  audience: string;
+  link?: string | null;
+  actor?: string | null;
+  isRead: boolean;
+  status: NotificationStatus;
+  scheduleAt?: string | null;
+  tenantId?: string | null;
+  createdAt: string;
 }
+
+function mapNotification(n: ApiNotification): NotificationRecord {
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    channel: n.channel === 'in_app' ? 'in-app' : n.channel,
+    priority: n.priority,
+    audience: (['all', 'class', 'staff', 'parents'] as const).includes(n.audience as NotificationAudience)
+      ? (n.audience as NotificationAudience)
+      : 'all',
+    scheduleAt: n.scheduleAt ? new Date(n.scheduleAt).toISOString().split('T')[0] : '',
+    status: n.status,
+    createdAt: n.createdAt,
+    updatedAt: n.createdAt,
+  };
+}
+
+const Q = {
+  list: ['notifications', 'list'] as const,
+  unread: ['notifications', 'unread'] as const,
+};
+
+function useNotificationMutation<TVars, TData>({
+  mutationFn,
+  successMsg,
+  invalidate = [Q.list, Q.unread],
+}: {
+  mutationFn: (vars: TVars) => Promise<TData>;
+  successMsg: string;
+  invalidate?: ReadonlyArray<readonly unknown[]>;
+}) {
+  const queryClient = useQueryClient();
+  const { success, error } = useToast();
+
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      success('Success', successMsg);
+      invalidate.forEach((key) => {
+        queryClient.invalidateQueries({ queryKey: [...key] });
+      });
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { message?: string | string[] } } };
+      const msg = e?.response?.data?.message;
+      error('Failed', Array.isArray(msg) ? msg.join(', ') : msg ?? 'Something went wrong');
+    },
+  });
+}
+
+// ─── Queries ────────────────────────────────────────────────────────────────────
 
 export const useGetNotifications = () =>
   useQuery({
-    queryKey: [API, 'list'],
-    queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...notifStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    },
+    queryKey: Q.list,
+    queryFn: () =>
+      apiClient
+        .get<ApiResponse<ApiNotification[]>>('/notifications', { params: { limit: 100 } })
+        .then(unwrapApi)
+        .then((items) => items.map(mapNotification)),
   });
 
+export const useGetUnreadCount = () =>
+  useQuery({
+    queryKey: Q.unread,
+    queryFn: () =>
+      apiClient
+        .get<ApiResponse<{ unreadCount: number }>>('/notifications/unread-count')
+        .then(unwrapApi),
+    refetchInterval: 30_000,
+  });
+
+// There is no GET /notifications/:id on the backend — derive from the list.
 export const useGetNotificationById = ({ notificationId }: { notificationId?: string }) =>
   useQuery({
-    queryKey: [API, 'detail', notificationId],
+    queryKey: [Q.list, 'detail', notificationId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return notifStore.find((n) => n.id === notificationId) ?? null;
+      const items = await apiClient
+        .get<ApiResponse<ApiNotification[]>>('/notifications', { params: { limit: 500 } })
+        .then(unwrapApi);
+      const found = items.find((n) => n.id === notificationId);
+      return found ? mapNotification(found) : null;
     },
     enabled: !!notificationId,
   });
 
+// ─── Mutations ──────────────────────────────────────────────────────────────────
+
 export const useCreateNotification = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<NotificationRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: NotificationStatus }) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: NotificationRecord = {
-        id: `N-${notifStore.length + 1}`,
-        status: body.status ?? (body.scheduleAt ? 'queued' : 'sent'),
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      notifStore = [created, ...notifStore];
-      return created;
-    },
+  useNotificationMutation<
+    Omit<NotificationRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: NotificationStatus },
+    NotificationRecord
+  >({
+    mutationFn: (body) =>
+      apiClient
+        .post<ApiResponse<ApiNotification>>('/notifications', {
+          title: body.title,
+          message: body.message,
+          channel: body.channel === 'in-app' ? 'in_app' : body.channel,
+          priority: body.priority,
+          audience: body.audience,
+          scheduleAt: body.scheduleAt || undefined,
+        })
+        .then(unwrapApi)
+        .then(mapNotification),
     successMsg: 'Notification created successfully',
-    errorMsg: 'Failed to create notification',
-    invalidateQueryKeys: [[API, 'list']],
   });
 
+export const useBulkNotification = () =>
+  useNotificationMutation<
+    { title: string; message: string; roles?: string[]; userIds?: string[]; type?: string; link?: string },
+    { message: string; sent: number }
+  >({
+    mutationFn: (body) =>
+      apiClient
+        .post<ApiResponse<{ message: string; sent: number }>>('/notifications/bulk', body)
+        .then(unwrapApi),
+    successMsg: 'Notification broadcast sent',
+  });
+
+export const useMarkNotificationRead = () =>
+  useNotificationMutation<{ id: string }, { message: string }>({
+    mutationFn: ({ id }) =>
+      apiClient.patch<ApiResponse<{ message: string }>>(`/notifications/${id}/read`).then(unwrapApi),
+    successMsg: 'Notification marked as read',
+  });
+
+export const useMarkAllNotificationsRead = () =>
+  useNotificationMutation<undefined, { message: string }>({
+    mutationFn: () =>
+      apiClient.patch<ApiResponse<{ message: string }>>('/notifications/read-all').then(unwrapApi),
+    successMsg: 'All notifications marked as read',
+  });
+
+// The backend exposes no update / delete / send-now endpoints for notifications.
+// These hooks preserve the UI contract but surface that limitation explicitly.
+const unsupported = (op: string) => () => {
+  throw new Error(`${op} notifications is not supported by the API`);
+};
+
 export const useUpdateNotification = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<NotificationRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = notifStore.find((n) => n.id === body.id);
-      if (!current) throw new Error('Notification not found');
-      const next: NotificationRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      notifStore = notifStore.map((n) => (n.id === body.id ? next : n));
-      return next;
-    },
-    successMsg: 'Notification updated successfully',
-    errorMsg: 'Failed to update notification',
-    invalidateQueryKeys: [[API, 'list'], [API, 'detail']],
+  useNotificationMutation<
+    { id: string } & Partial<Omit<NotificationRecord, 'id' | 'createdAt'>>,
+    NotificationRecord
+  >({
+    mutationFn: unsupported('Updating'),
+    successMsg: 'Notification updated',
   });
 
 export const useDeleteNotification = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      notifStore = notifStore.filter((n) => n.id !== body.id);
-      return { id: body.id };
-    },
-    successMsg: 'Notification deleted successfully',
-    errorMsg: 'Failed to delete notification',
-    invalidateQueryKeys: [[API, 'list']],
+  useNotificationMutation<{ id: string }, { id: string }>({
+    mutationFn: unsupported('Deleting'),
+    successMsg: 'Notification deleted',
+    invalidate: [Q.list],
   });
 
 export const useSendNowNotification = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(180);
-      ensureSeed();
-      const current = notifStore.find((n) => n.id === body.id);
-      if (!current) throw new Error('Notification not found');
-      const next: NotificationRecord = { ...current, status: 'sent', scheduleAt: '', updatedAt: new Date().toISOString() };
-      notifStore = notifStore.map((n) => (n.id === body.id ? next : n));
-      return next;
-    },
+  useNotificationMutation<{ id: string }, NotificationRecord>({
+    mutationFn: unsupported('Sending'),
     successMsg: 'Notification sent',
-    errorMsg: 'Failed to send notification',
-    invalidateQueryKeys: [[API, 'list'], [API, 'detail']],
   });
 
 export function formatNotificationAudience(n: NotificationRecord) {
@@ -165,4 +211,3 @@ export function formatNotificationAudience(n: NotificationRecord) {
   if (n.audience === 'class') return `Class ${n.classId ?? '-'}-${n.section ?? '-'}`;
   return n.audience;
 }
-

@@ -4,6 +4,24 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { ToastContainer } from '@/components/ui/Toast';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { useMe } from '@/features/auth/services/auth.service';
+import { useAppDispatch } from '@/hooks/useAppDispatch';
+import { setUser } from '@/store/slices/authSlice';
+import { useEffect } from 'react';
+
+// Refreshes the authenticated user from GET /auth/me on app mount
+function AuthSync() {
+  const dispatch = useAppDispatch();
+  const { data } = useMe();
+
+  useEffect(() => {
+    if (data?.user) {
+      dispatch(setUser(data.user));
+    }
+  }, [data, dispatch]);
+
+  return null;
+}
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -28,6 +46,7 @@ export function AppShell() {
         </main>
       </div>
 
+      <AuthSync />
       <ToastContainer />
     </div>
   );

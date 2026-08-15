@@ -14,9 +14,16 @@ import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/hooks';
 import { formatCurrency, formatRelativeTime } from '@/utils';
+import {
+  useDashboardStats,
+  useEnrollmentTrend,
+  useAttendanceSummary,
+  useRecentActivity,
+  mapDashboardStat,
+} from '../services/dashboard.service';
 
 // ─── Mock data ──────────────────────────────────────────────────────────────────
-const enrollmentData = [
+const enrollmentStatic = [
   { month: 'Apr', students: 820, target: 850 },
   { month: 'May', students: 845, target: 860 },
   { month: 'Jun', students: 790, target: 870 },
@@ -40,7 +47,7 @@ const feeData = [
   { month: 'Mar', collected: 525000, pending: 42000 },
 ];
 
-const attendanceData = [
+const attendanceStatic = [
   { name: 'Present', value: 87, color: '#10b981' },
   { name: 'Absent', value: 8, color: '#f43f5e' },
   { name: 'Late', value: 5, color: '#f59e0b' },
@@ -55,7 +62,7 @@ const subjectData = [
   { subject: 'Computer', avg: 91 },
 ];
 
-const recentActivities = [
+const recentActivitiesStatic = [
   { id: '1', user: 'Priya Sharma', role: 'Admin', action: 'Added 12 new students to Class 10-A', time: new Date(Date.now() - 8 * 60 * 1000).toISOString(), type: 'create' as const },
   { id: '2', user: 'Ramesh Kumar', role: 'Teacher', action: 'Marked attendance for Class 9-B', time: new Date(Date.now() - 25 * 60 * 1000).toISOString(), type: 'update' as const },
   { id: '3', user: 'Finance Team', role: 'Admin', action: 'Generated fee invoices for March 2025', time: new Date(Date.now() - 1.5 * 3600 * 1000).toISOString(), type: 'create' as const },
@@ -70,6 +77,58 @@ const upcomingEvents = [
   { id: '3', title: 'Parent-Teacher Meeting', date: '2025-04-22', type: 'meeting', color: 'bg-amber-500' },
   { id: '4', title: 'Science Exhibition', date: '2025-04-25', type: 'event', color: 'bg-emerald-500' },
   { id: '5', title: 'Fee Due Date — April', date: '2025-04-30', type: 'fee', color: 'bg-blue-500' },
+];
+
+// Fallback stats when the API has no data yet
+const fallbackStats = [
+  {
+    label: 'Total Students',
+    value: '1,105',
+    change: 4.2,
+    changeType: 'positive' as const,
+    icon: <Users className="h-5 w-5" />,
+    iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+  },
+  {
+    label: "Today's Attendance",
+    value: '87%',
+    change: 2.1,
+    changeType: 'positive' as const,
+    icon: <UserCheck className="h-5 w-5" />,
+    iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+  },
+  {
+    label: 'Fee Collected',
+    value: '₹5.25L',
+    change: 8.4,
+    changeType: 'positive' as const,
+    icon: <CreditCard className="h-5 w-5" />,
+    iconBg: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
+  },
+  {
+    label: 'Active Teachers',
+    value: '68',
+    change: 1.5,
+    changeType: 'positive' as const,
+    icon: <GraduationCap className="h-5 w-5" />,
+    iconBg: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  {
+    label: 'Active Classes',
+    value: '42',
+    change: 0,
+    changeType: 'neutral' as const,
+    icon: <BookOpen className="h-5 w-5" />,
+    iconBg: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
+  },
+  {
+    label: 'Pending Notices',
+    value: '7',
+    change: -2,
+    changeType: 'negative' as const,
+    icon: <Bell className="h-5 w-5" />,
+    iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
+  },
 ];
 
 // ─── Custom tooltip for recharts ────────────────────────────────────────────────
@@ -90,57 +149,44 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const statsQuery = useDashboardStats(user?.role);
+  const enrollmentQuery = useEnrollmentTrend();
+  const attendanceQuery = useAttendanceSummary();
+  const activityQuery = useRecentActivity();
 
-  const stats = useMemo(() => [
-    {
-      label: 'Total Students',
-      value: '1,105',
-      change: 4.2,
-      changeType: 'positive' as const,
-      icon: <Users className="h-5 w-5" />,
-      iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    },
-    {
-      label: "Today's Attendance",
-      value: '87%',
-      change: 2.1,
-      changeType: 'positive' as const,
-      icon: <UserCheck className="h-5 w-5" />,
-      iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
-    },
-    {
-      label: 'Fee Collected',
-      value: '₹5.25L',
-      change: 8.4,
-      changeType: 'positive' as const,
-      icon: <CreditCard className="h-5 w-5" />,
-      iconBg: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
-    },
-    {
-      label: 'Active Teachers',
-      value: '68',
-      change: 1.5,
-      changeType: 'positive' as const,
-      icon: <GraduationCap className="h-5 w-5" />,
-      iconBg: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-    },
-    {
-      label: 'Active Classes',
-      value: '42',
-      change: 0,
-      changeType: 'neutral' as const,
-      icon: <BookOpen className="h-5 w-5" />,
-      iconBg: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
-    },
-    {
-      label: 'Pending Notices',
-      value: '7',
-      change: -2,
-      changeType: 'negative' as const,
-      icon: <Bell className="h-5 w-5" />,
-      iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
-    },
-  ], []);
+  const stats = useMemo(() => {
+    const apiStats = statsQuery.data?.stats;
+    return apiStats?.length ? apiStats.map(mapDashboardStat) : fallbackStats;
+  }, [statsQuery.data]);
+
+  const enrollmentData = useMemo(
+    () => (enrollmentQuery.data?.length ? enrollmentQuery.data : enrollmentStatic),
+    [enrollmentQuery.data]
+  );
+
+  const attendanceData = useMemo(() => {
+    const points = attendanceQuery.data;
+    if (!points?.length) return attendanceStatic;
+    const latest = points[points.length - 1];
+    const present = latest.percentage;
+    return [
+      { name: 'Present', value: present, color: '#10b981' },
+      { name: 'Absent', value: 100 - present, color: '#f43f5e' },
+    ];
+  }, [attendanceQuery.data]);
+
+  const recentActivities = useMemo(() => {
+    const items = activityQuery.data;
+    if (!items?.length) return recentActivitiesStatic;
+    return items.map((a) => ({
+      id: a.id,
+      user: a.user,
+      role: a.module,
+      action: a.action,
+      time: a.timestamp,
+      type: a.type as 'create' | 'update' | 'other',
+    }));
+  }, [activityQuery.data]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -169,7 +215,7 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {stats.map((s) => (
-          <StatCard key={s.label} {...s} className="xl:col-span-1" />
+          <StatCard key={s.label} {...s} isLoading={statsQuery.isLoading} className="xl:col-span-1" />
         ))}
       </div>
 

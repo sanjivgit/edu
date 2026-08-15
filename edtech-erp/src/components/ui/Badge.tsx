@@ -66,6 +66,12 @@ const STATUS_MAP: Record<string, VariantProps<typeof badgeVariants>['variant']> 
   draft: 'ghost',
   info: 'info',
   transferred: 'info',
+  // Billing / subscription statuses
+  trial: 'info',
+  expired: 'destructive',
+  cancelled: 'ghost',
+  suspended: 'destructive',
+  issued: 'info',
 };
 
 interface StatusBadgeProps {

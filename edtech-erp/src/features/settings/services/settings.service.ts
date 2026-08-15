@@ -1,64 +1,96 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
+import { useAppSelector } from '@/hooks/useAppDispatch';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
 import type { SettingsPayload } from '../validations/settings.schema';
 
 const API = '/settings';
 
-let settingsStore: SettingsPayload | null = null;
+interface BackendSystem {
+  institution?: {
+    institutionName?: string;
+    shortCode?: string;
+    registrationNo?: string;
+    institutionType?: string;
+    academicYearId?: string | null;
+    contactEmail?: string;
+    phone?: string;
+    website?: string;
+  };
+  profile?: { fullName?: string };
+  notifications?: Record<string, boolean>;
+  systemConfig?: Record<string, unknown>;
+}
 
-function ensureSeed() {
-  if (settingsStore) return;
-  settingsStore = {
+const NOTIF_KEYS = [
+  'feeAlerts',
+  'attendanceAlerts',
+  'homeworkAssignments',
+  'examScheduleUpdates',
+  'noticeboardUpdates',
+  'chatMessages',
+  'systemAlerts',
+  'weeklyDigest',
+] as const;
+
+function toSettingsPayload(b: BackendSystem, user: { name?: string; email?: string; phone?: string } | null): SettingsPayload {
+  const inst = b.institution ?? {};
+  const notif = b.notifications ?? {};
+  const notifications = {} as Record<string, boolean>;
+  for (const key of NOTIF_KEYS) notifications[key] = !!notif[key];
+  return {
     institution: {
-      name: 'Delhi Public School — Sector 12',
-      shortCode: 'DPS-SEC12',
-      registrationNo: 'REG/2009/DL/00542',
-      type: 'school',
-      academicYear: '2024–2025',
-      contactEmail: 'admin@dps-sec12.edu.in',
-      phone: '+91 11 4567 8900',
-      website: 'https://dps-sec12.edu.in',
+      name: inst.institutionName ?? '',
+      shortCode: inst.shortCode ?? '',
+      registrationNo: inst.registrationNo ?? '',
+      type: (inst.institutionType as SettingsPayload['institution']['type']) ?? 'school',
+      academicYear: inst.academicYearId ?? '',
+      contactEmail: inst.contactEmail ?? '',
+      phone: inst.phone ?? '',
+      website: inst.website ?? '',
     },
     profile: {
-      fullName: 'Admin User',
-      email: 'admin@educore.io',
-      phone: '+91 98765 43210',
+      fullName: b.profile?.fullName ?? user?.name ?? '',
+      email: user?.email ?? '',
+      phone: user?.phone ?? '',
       language: 'en',
     },
-    notifications: {
-      feeAlerts: true,
-      attendanceAlerts: true,
-      homeworkAssignments: true,
-      examScheduleUpdates: true,
-      noticeboardUpdates: false,
-      chatMessages: true,
-      systemAlerts: false,
-      weeklyDigest: false,
-    },
+    notifications: notifications as SettingsPayload['notifications'],
   };
 }
 
-export const useGetSettings = () =>
-  useQuery({
-    queryKey: [API, 'all'],
+export const useGetSettings = () => {
+  const user = useAppSelector((s) => s.auth.user);
+  return useQuery({
+    queryKey: [API, 'system'],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return settingsStore!;
+      const res = await apiClient.get<ApiResponse<BackendSystem>>(`${API}/system`).then(unwrapApi);
+      return toSettingsPayload(res ?? {}, user);
     },
   });
+};
 
 export const useSaveSettings = () =>
-  useAppMutation({
-    mutationFn: async (body: SettingsPayload) => {
-      await mockDelay(200);
-      ensureSeed();
-      settingsStore = { ...body };
-      return settingsStore;
+  useAppMutation<SettingsPayload, SettingsPayload>({
+    mutationFn: async (body) => {
+      const saved = await apiClient
+        .put<ApiResponse<BackendSystem>>(`${API}/system`, {
+          institution: {
+            institutionName: body.institution.name,
+            shortCode: body.institution.shortCode,
+            registrationNo: body.institution.registrationNo,
+            institutionType: body.institution.type,
+            contactEmail: body.institution.contactEmail,
+            phone: body.institution.phone,
+            website: body.institution.website,
+          },
+          notifications: body.notifications,
+        })
+        .then(unwrapApi);
+      return toSettingsPayload(saved ?? {}, null);
     },
     successMsg: 'Settings updated successfully',
     errorMsg: 'Failed to update settings',
-    invalidateQueryKeys: [[API, 'all']],
+    invalidateQueryKeys: [[API, 'system']],
   });
-

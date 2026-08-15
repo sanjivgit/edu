@@ -5,7 +5,8 @@ import {
   Settings, User, ChevronRight, Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth, useTheme, useNotifications } from '@/hooks';
+import { useAuth, useTheme } from '@/hooks';
+import { useGetUnreadCount } from '@/features/notifications/services/notifications.service';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { setColorMode, setThemeVariant } from '@/store/slices/themeSlice';
 import { toggleSidebar } from '@/store/slices/themeSlice';
@@ -120,7 +121,8 @@ function ThemeMenu() {
 
 // ─── Notification Bell ──────────────────────────────────────────────────────────
 function NotificationBell() {
-  const { unreadCount } = useNotifications();
+  const { data } = useGetUnreadCount();
+  const unreadCount = data?.unreadCount ?? 0;
   return (
     <Link to="/notifications">
       <Button size="icon" variant="ghost" className="text-muted-foreground relative">

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { resolveClassDisplayMap, resolveClassId } from '@/features/common/services/lookups.service';
 
 export type NoticeCategory = 'general' | 'academic' | 'event' | 'urgent';
 export type NoticeStatus = 'draft' | 'published';
@@ -26,63 +28,66 @@ export interface NoticeRecord {
   views: number;
 }
 
-const API = '/noticeboard';
-let noticeStore: NoticeRecord[] = [];
+const API = '/notices';
 
-function ensureSeed() {
-  if (noticeStore.length) return;
-  const now = new Date().toISOString();
-  const today = new Date().toISOString().split('T')[0];
-  noticeStore = [
-    {
-      id: 'NTC-1',
-      title: 'Parent-Teacher Meeting',
-      message: 'PTM will be held this Saturday at 10:00 AM. Please be on time.',
-      category: 'event',
-      publishAt: today,
-      expireAt: '',
-      audience: { scope: 'parents' },
-      status: 'published',
-      createdAt: now,
-      updatedAt: now,
-      views: 128,
+interface BackendNotice {
+  id: string;
+  title: string;
+  message: string;
+  category: NoticeCategory;
+  publishAt: string;
+  expireAt?: string | null;
+  status: NoticeStatus;
+  views: number;
+  audience?: { scope: NoticeAudienceScope; classId?: string | null; section?: string | null };
+  scope?: NoticeAudienceScope;
+  classId?: string | null;
+  section?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function toDateString(value?: string | null): string {
+  if (!value) return '';
+  return value.split('T')[0];
+}
+
+function toNoticeRecord(n: BackendNotice, classMap?: Map<string, string>): NoticeRecord {
+  const scope = n.audience?.scope ?? n.scope ?? 'all';
+  const classId = n.audience?.classId ?? n.classId ?? undefined;
+  const section = n.audience?.section ?? n.section ?? undefined;
+  return {
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    category: n.category,
+    publishAt: toDateString(n.publishAt),
+    expireAt: toDateString(n.expireAt),
+    audience: {
+      scope,
+      classId: classId ? (classMap?.get(classId) ?? classId) : '',
+      section: section ?? '',
     },
-    {
-      id: 'NTC-2',
-      title: 'Class 10A Extra Math Class',
-      message: 'Extra class for Algebra revision on Wednesday, 3:00 PM.',
-      category: 'academic',
-      publishAt: today,
-      expireAt: '',
-      audience: { scope: 'class', classId: '10', section: 'A' },
-      status: 'draft',
-      createdAt: now,
-      updatedAt: now,
-      views: 0,
-    },
-    {
-      id: 'NTC-3',
-      title: 'Urgent: School will close early',
-      message: 'Due to weather conditions, school will close at 1:00 PM today.',
-      category: 'urgent',
-      publishAt: today,
-      expireAt: '',
-      audience: { scope: 'all' },
-      status: 'published',
-      createdAt: now,
-      updatedAt: now,
-      views: 342,
-    },
-  ];
+    status: n.status,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
+    views: n.views,
+  };
 }
 
 export const useGetNotices = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...noticeStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendNotice[] }>>(API, { params: { limit: 500 } })
+        .then(unwrapApi);
+      const items = res?.items ?? [];
+      const classIds = items
+        .map((i) => i.audience?.classId ?? i.classId)
+        .filter((id): id is string => !!id);
+      const classMap = await resolveClassDisplayMap(classIds);
+      return items.map((i) => toNoticeRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -90,28 +95,38 @@ export const useGetNoticeById = ({ noticeId }: { noticeId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', noticeId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return noticeStore.find((n) => n.id === noticeId) ?? null;
+      if (!noticeId) return null;
+      const n = await apiClient.get<ApiResponse<BackendNotice>>(`${API}/${noticeId}`).then(unwrapApi);
+      const classId = n.audience?.classId ?? n.classId;
+      const classMap = classId ? await resolveClassDisplayMap([classId]) : new Map<string, string>();
+      return toNoticeRecord(n, classMap);
     },
     enabled: !!noticeId,
   });
 
 export const useCreateNotice = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<NoticeRecord, 'id' | 'createdAt' | 'updatedAt' | 'views'>) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: NoticeRecord = {
-        id: `NTC-${noticeStore.length + 1}`,
-        createdAt: now,
-        updatedAt: now,
-        views: 0,
-        ...body,
-      };
-      noticeStore = [created, ...noticeStore];
-      return created;
+  useAppMutation<
+    NoticeRecord,
+    Omit<NoticeRecord, 'id' | 'createdAt' | 'updatedAt' | 'views'>
+  >({
+    mutationFn: async (body) => {
+      const classId = body.audience.scope === 'class' && body.audience.classId
+        ? await resolveClassId(body.audience.classId)
+        : undefined;
+      const created = await apiClient
+        .post<ApiResponse<BackendNotice>>(API, {
+          title: body.title,
+          message: body.message,
+          category: body.category,
+          publishAt: body.publishAt,
+          expireAt: body.expireAt || undefined,
+          scope: body.audience.scope,
+          classId,
+          section: body.audience.section || undefined,
+          status: body.status,
+        })
+        .then(unwrapApi);
+      return toNoticeRecord(created);
     },
     successMsg: 'Notice created successfully',
     errorMsg: 'Failed to create notice',
@@ -119,15 +134,28 @@ export const useCreateNotice = () =>
   });
 
 export const useUpdateNotice = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<NoticeRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = noticeStore.find((n) => n.id === body.id);
-      if (!current) throw new Error('Notice not found');
-      const next: NoticeRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      noticeStore = noticeStore.map((n) => (n.id === body.id ? next : n));
-      return next;
+  useAppMutation<
+    NoticeRecord,
+    { id: string } & Omit<NoticeRecord, 'id' | 'createdAt' | 'updatedAt' | 'views'>
+  >({
+    mutationFn: async (body) => {
+      const classId = body.audience.scope === 'class' && body.audience.classId
+        ? await resolveClassId(body.audience.classId)
+        : undefined;
+      const updated = await apiClient
+        .put<ApiResponse<BackendNotice>>(`${API}/${body.id}`, {
+          title: body.title,
+          message: body.message,
+          category: body.category,
+          publishAt: body.publishAt,
+          expireAt: body.expireAt || undefined,
+          scope: body.audience.scope,
+          classId,
+          section: body.audience.section || undefined,
+          status: body.status,
+        })
+        .then(unwrapApi);
+      return toNoticeRecord(updated);
     },
     successMsg: 'Notice updated successfully',
     errorMsg: 'Failed to update notice',
@@ -135,11 +163,9 @@ export const useUpdateNotice = () =>
   });
 
 export const useDeleteNotice = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      noticeStore = noticeStore.filter((n) => n.id !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`${API}/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Notice deleted successfully',
@@ -148,15 +174,10 @@ export const useDeleteNotice = () =>
   });
 
 export const usePublishNotice = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(180);
-      ensureSeed();
-      const current = noticeStore.find((n) => n.id === body.id);
-      if (!current) throw new Error('Notice not found');
-      const next: NoticeRecord = { ...current, status: 'published', updatedAt: new Date().toISOString() };
-      noticeStore = noticeStore.map((n) => (n.id === body.id ? next : n));
-      return next;
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.patch(`${API}/${body.id}/publish`);
+      return { id: body.id };
     },
     successMsg: 'Notice published successfully',
     errorMsg: 'Failed to publish notice',
@@ -170,4 +191,3 @@ export function formatNoticeAudience(a: NoticeAudience) {
   if (a.scope === 'class') return `Class ${a.classId ?? '-'}-${a.section ?? '-'}`;
   return a.scope;
 }
-

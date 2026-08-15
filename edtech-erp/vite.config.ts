@@ -20,5 +20,15 @@ export default defineConfig({
   },
   server:{
     allowedHosts: true
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/test/integration/**/*.test.{ts,tsx}'],
+    css: false,
+    clearMocks: true,
+    restoreMocks: true,
+    testTimeout: 15000,
   }
 })

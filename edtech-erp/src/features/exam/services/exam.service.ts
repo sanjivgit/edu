@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findSubjectIdByName, resolveClassDisplayMap, resolveClassId } from '@/features/common/services/lookups.service';
 
 export type ExamTerm = 'term-1' | 'term-2' | 'final';
 export type ExamStatus = 'draft' | 'scheduled' | 'completed';
@@ -36,51 +38,73 @@ export interface ExamResultRow {
 }
 
 const API = '/exam';
-let examStore: ExamRecord[] = [];
-let examResultsStore: ExamResultRow[] = [];
 
-function ensureSeed() {
-  if (examStore.length) return;
-  const now = new Date().toISOString();
-  const today = new Date();
-  const iso = (d: Date) => d.toISOString().split('T')[0];
-  const d1 = iso(today);
-  const d2 = iso(new Date(today.getTime() + 1000 * 60 * 60 * 24 * 1));
-  const d3 = iso(new Date(today.getTime() + 1000 * 60 * 60 * 24 * 2));
+interface BackendExamPaper {
+  subjectId: string | null;
+  subjectName: string | null;
+  subject?: string;
+  date: string;
+  startTime: string;
+  durationMinutes: number;
+  totalMarks: number;
+}
 
-  examStore = [
-    {
-      id: 'EX-1',
-      name: 'Term 1 Examination',
-      term: 'term-1',
-      classId: '10',
-      section: 'A',
-      status: 'scheduled',
-      papers: [
-        { subject: 'Mathematics', date: d1, startTime: '09:30', durationMinutes: 90, totalMarks: 100 },
-        { subject: 'Science', date: d2, startTime: '09:30', durationMinutes: 90, totalMarks: 100 },
-        { subject: 'English', date: d3, startTime: '09:30', durationMinutes: 90, totalMarks: 100 },
-      ],
-      notes: 'Report 20 minutes early. Bring admit card.',
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+interface BackendExam {
+  id: string;
+  name: string;
+  term: ExamTerm;
+  classId: string;
+  className?: string;
+  section: string | null;
+  status: ExamStatus;
+  notes: string | null;
+  papers?: BackendExamPaper[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-  examResultsStore = [
-    { id: 'EXR-1', examId: 'EX-1', student: 'Aarav Sharma', rollNo: '010', total: 276, grade: 'A' },
-    { id: 'EXR-2', examId: 'EX-1', student: 'Priya Patel', rollNo: '011', total: 264, grade: 'A' },
-    { id: 'EXR-3', examId: 'EX-1', student: 'Riya Singh', rollNo: '012', total: 230, grade: 'B' },
-  ];
+function toExamPaper(p: BackendExamPaper): ExamPaper {
+  return {
+    subject: p.subjectName ?? p.subject ?? '',
+    date: p.date ? new Date(p.date).toISOString().split('T')[0] : '',
+    startTime: p.startTime ?? '',
+    durationMinutes: Number(p.durationMinutes),
+    totalMarks: Number(p.totalMarks),
+  };
+}
+
+function classDisplay(classId: string, className?: string, classMap?: Map<string, string>): string {
+  const m = (className ?? '').match(/(\d+)/);
+  if (m) return m[1];
+  if (classMap && classMap.size) return classMap.get(classId) ?? classId;
+  return classId;
+}
+
+function toExamRecord(e: BackendExam, classMap?: Map<string, string>): ExamRecord {
+  return {
+    id: e.id,
+    name: e.name,
+    term: e.term,
+    classId: classDisplay(e.classId, e.className, classMap),
+    section: e.section ?? '',
+    status: e.status,
+    papers: (e.papers ?? []).map(toExamPaper),
+    notes: e.notes ?? '',
+    createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
+  };
 }
 
 export const useGetExams = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...examStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendExam[] }>>('/exams', { params: { limit: 500 } })
+        .then(unwrapApi);
+      const items = res?.items ?? [];
+      const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
+      return items.map((i) => toExamRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -88,9 +112,11 @@ export const useGetExamById = ({ examId }: { examId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', examId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return examStore.find((e) => e.id === examId) ?? null;
+      if (!examId) return null;
+      const e = await apiClient
+        .get<ApiResponse<BackendExam & { class_?: { name: string } }>>(`/exams/${examId}`)
+        .then(unwrapApi);
+      return toExamRecord({ ...e, className: e.class_?.name });
     },
     enabled: !!examId,
   });
@@ -99,28 +125,57 @@ export const useGetExamResults = ({ examId }: { examId?: string }) =>
   useQuery({
     queryKey: [API, 'results', examId],
     queryFn: async () => {
-      await mockDelay(140);
-      ensureSeed();
-      return examResultsStore.filter((r) => r.examId === examId);
+      if (!examId) return [];
+      const res = await apiClient
+        .get<
+          ApiResponse<
+            Array<{ id: string; examId: string; student: string; rollNo: string; total: number; grade: string }>
+          >
+        >(`/exams/${examId}/results`)
+        .then(unwrapApi);
+      return (res ?? []).map((r) => ({ id: r.id, examId: r.examId, student: r.student, rollNo: r.rollNo, total: r.total, grade: r.grade }));
     },
     enabled: !!examId,
   });
 
 export const useCreateExam = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<ExamRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: ExamStatus }) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: ExamRecord = {
-        id: `EX-${examStore.length + 1}`,
-        status: body.status ?? 'scheduled',
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      examStore = [created, ...examStore];
-      return created;
+  useAppMutation<
+    ExamRecord,
+    {
+      name: string;
+      term: ExamTerm;
+      classId: string;
+      section: string;
+      papers: ExamPaper[];
+      notes?: string;
+      status?: ExamStatus;
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const papers = await Promise.all(
+        body.papers.map(async (p) => ({
+          subjectId: await findSubjectIdByName(p.subject),
+          subjectName: p.subject,
+          date: p.date,
+          startTime: p.startTime,
+          durationMinutes: Number(p.durationMinutes),
+          totalMarks: Number(p.totalMarks),
+        })),
+      );
+      const created = await apiClient
+        .post<ApiResponse<BackendExam>>('/exams', {
+          name: body.name,
+          term: body.term,
+          classId,
+          section: body.section || undefined,
+          status: body.status ?? 'scheduled',
+          notes: body.notes ?? undefined,
+          papers,
+        })
+        .then(unwrapApi);
+      return toExamRecord(created);
     },
     successMsg: 'Exam scheduled successfully',
     errorMsg: 'Failed to schedule exam',
@@ -128,15 +183,44 @@ export const useCreateExam = () =>
   });
 
 export const useUpdateExam = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<ExamRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = examStore.find((e) => e.id === body.id);
-      if (!current) throw new Error('Exam not found');
-      const next: ExamRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      examStore = examStore.map((e) => (e.id === body.id ? next : e));
-      return next;
+  useAppMutation<
+    ExamRecord,
+    {
+      id: string;
+      name: string;
+      term: ExamTerm;
+      classId: string;
+      section: string;
+      papers: ExamPaper[];
+      notes?: string;
+      status: ExamStatus;
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const papers = await Promise.all(
+        body.papers.map(async (p) => ({
+          subjectId: await findSubjectIdByName(p.subject),
+          subjectName: p.subject,
+          date: p.date,
+          startTime: p.startTime,
+          durationMinutes: Number(p.durationMinutes),
+          totalMarks: Number(p.totalMarks),
+        })),
+      );
+      const updated = await apiClient
+        .put<ApiResponse<BackendExam>>(`/exams/${body.id}`, {
+          name: body.name,
+          term: body.term,
+          classId,
+          section: body.section || undefined,
+          status: body.status,
+          notes: body.notes ?? undefined,
+          papers,
+        })
+        .then(unwrapApi);
+      return toExamRecord(updated);
     },
     successMsg: 'Exam updated successfully',
     errorMsg: 'Failed to update exam',
@@ -144,16 +228,12 @@ export const useUpdateExam = () =>
   });
 
 export const useDeleteExam = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      examStore = examStore.filter((e) => e.id !== body.id);
-      examResultsStore = examResultsStore.filter((r) => r.examId !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`/exams/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Exam deleted successfully',
     errorMsg: 'Failed to delete exam',
     invalidateQueryKeys: [[API, 'list']],
   });
-

@@ -1,4 +1,5 @@
-import { mockDelay } from '@/shared/utils';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 
 export interface Product {
   id: string;
@@ -17,41 +18,51 @@ export interface ProductStats {
   inventoryValue: number;
 }
 
-let productStore: Product[] = [
-  { id: 'PRD-001', name: 'Smart Classroom Board', sku: 'SCB-1001', category: 'Hardware', stock: 14, price: 35999, status: 'active' },
-  { id: 'PRD-002', name: 'Science Lab Kit', sku: 'SLK-2003', category: 'Lab', stock: 8, price: 12999, status: 'active' },
-  { id: 'PRD-003', name: 'Sports Equipment Set', sku: 'SES-3100', category: 'Sports', stock: 22, price: 8999, status: 'active' },
-  { id: 'PRD-004', name: 'Library RFID Scanner', sku: 'LRS-0091', category: 'Library', stock: 3, price: 15499, status: 'inactive' },
-  { id: 'PRD-005', name: 'Projector Mount Kit', sku: 'PMK-4550', category: 'Hardware', stock: 5, price: 4999, status: 'active' },
-];
+interface BackendProduct {
+  id: string;
+  name: string;
+  sku: string;
+  category: string;
+  stock: number;
+  price: number | string;
+  status: 'active' | 'inactive';
+}
 
-function calculateStats(list: Product[]): ProductStats {
+function toProduct(p: BackendProduct): Product {
   return {
-    totalProducts: list.length,
-    activeProducts: list.filter((item) => item.status === 'active').length,
-    lowStockProducts: list.filter((item) => item.stock <= 5).length,
-    inventoryValue: list.reduce((sum, item) => sum + item.stock * item.price, 0),
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    category: p.category,
+    stock: Number(p.stock),
+    price: Number(p.price),
+    status: p.status,
   };
 }
 
 export const productService = {
   async getProducts(): Promise<Product[]> {
-    await mockDelay(300);
-    return [...productStore];
+    const res = await apiClient
+      .get<ApiResponse<{ items: BackendProduct[] }>>('/products', { params: { limit: 500 } })
+      .then(unwrapApi);
+    const items = Array.isArray(res) ? res : res?.items ?? [];
+    return items.map(toProduct);
   },
 
   async getProductStats(): Promise<ProductStats> {
-    await mockDelay(200);
-    return calculateStats(productStore);
+    const res = await apiClient.get<ApiResponse<ProductStats>>('/products/stats').then(unwrapApi);
+    return {
+      totalProducts: Number(res?.totalProducts ?? 0),
+      activeProducts: Number(res?.activeProducts ?? 0),
+      lowStockProducts: Number(res?.lowStockProducts ?? 0),
+      inventoryValue: Number(res?.inventoryValue ?? 0),
+    };
   },
 
   async createProduct(payload: Omit<Product, 'id'>): Promise<Product> {
-    await mockDelay(300);
-    const created: Product = {
-      id: `PRD-${String(productStore.length + 1).padStart(3, '0')}`,
-      ...payload,
-    };
-    productStore = [...productStore, created];
-    return created;
+    const created = await apiClient
+      .post<ApiResponse<BackendProduct>>('/products', payload)
+      .then(unwrapApi);
+    return toProduct(created);
   },
 };

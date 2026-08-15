@@ -39,6 +39,14 @@ const AuditLogsPage = lazy(() => import('@/features/audit-logs/pages/AuditLogsPa
 const RolesPage = lazy(() => import('@/features/roles/pages/RolesPage'));
 const ProductPage = lazy(() => import('@/features/product/pages/ProductPage'));
 const TeachersPage = lazy(() => import('@/features/teachers/pages/TeachersPage'));
+const StudentsPage = lazy(() => import('@/features/students/pages/StudentsPage'));
+
+const AdminOverviewPage = lazy(() => import('@/features/admin/pages/AdminOverviewPage'));
+const AdminTenantsPage = lazy(() => import('@/features/admin/pages/AdminTenantsPage'));
+const AdminTenantDetailPage = lazy(() => import('@/features/admin/pages/AdminTenantDetailPage'));
+const AdminSubscriptionsPage = lazy(() => import('@/features/admin/pages/AdminSubscriptionsPage'));
+const AdminPlansPage = lazy(() => import('@/features/admin/pages/AdminPlansPage'));
+const AdminInvoicesPage = lazy(() => import('@/features/admin/pages/AdminInvoicesPage'));
 
 // ─── Fallback loader ────────────────────────────────────────────────────────────
 function PageLoader() {
@@ -122,6 +130,7 @@ const router = createBrowserRouter([
       { path: 'gallery/*', element: <ProtectedModule moduleId="gallery"><GalleryPage /></ProtectedModule> },
       { path: 'syllabus/*', element: <ProtectedModule moduleId="syllabus"><SyllabusPage /></ProtectedModule> },
       { path: 'teachers/*', element: <ProtectedModule moduleId="teachers"><TeachersPage /></ProtectedModule> },
+      { path: 'students/*', element: <ProtectedModule moduleId="students"><StudentsPage /></ProtectedModule> },
       { path: 'classes/*', element: <ProtectedModule moduleId="classes"><ClassesPage /></ProtectedModule> },
       { path: 'transport/*', element: <ProtectedModule moduleId="transport"><TransportPage /></ProtectedModule> },
       { path: 'live-classes/*', element: <ProtectedModule moduleId="live-lecture"><LiveLecturePage /></ProtectedModule> },
@@ -130,6 +139,12 @@ const router = createBrowserRouter([
       { path: 'audit-logs', element: <ProtectedModule moduleId="audit-logs"><AuditLogsPage /></ProtectedModule> },
       { path: 'roles/*', element: <ProtectedModule moduleId="roles"><RolesPage /></ProtectedModule> },
       { path: 'products/*', element: <ProtectedModule moduleId="product"><ProductPage /></ProtectedModule> },
+      { path: 'billing', element: <ProtectedModule moduleId="billing"><AdminOverviewPage /></ProtectedModule> },
+      { path: 'billing/schools', element: <ProtectedModule moduleId="billing-tenants"><AdminTenantsPage /></ProtectedModule> },
+      { path: 'billing/schools/:id', element: <ProtectedModule moduleId="billing-tenants"><AdminTenantDetailPage /></ProtectedModule> },
+      { path: 'billing/subscriptions', element: <ProtectedModule moduleId="billing-subscriptions"><AdminSubscriptionsPage /></ProtectedModule> },
+      { path: 'billing/plans', element: <ProtectedModule moduleId="billing-plans"><AdminPlansPage /></ProtectedModule> },
+      { path: 'billing/invoices', element: <ProtectedModule moduleId="billing-invoices"><AdminInvoicesPage /></ProtectedModule> },
     ],
   },
   { path: '*', element: <Navigate to="/dashboard" replace /> },

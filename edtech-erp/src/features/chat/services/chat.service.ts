@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
 
 export type MessageDirection = 'in' | 'out';
 
@@ -24,95 +25,78 @@ export interface ChatMessage {
 }
 
 const API = '/chat';
-let conversationStore: ConversationRecord[] = [];
-let messageStore: ChatMessage[] = [];
 
-function ensureSeed() {
-  if (conversationStore.length) return;
-  const now = new Date();
-  const iso = (d: Date) => d.toISOString();
+interface BackendMessage {
+  id: string;
+  conversationId: string;
+  direction: MessageDirection;
+  sender: string;
+  text: string;
+  at: string;
+}
 
-  conversationStore = [
-    {
-      id: 'C-1',
-      title: 'Ms. Joshi',
-      subtitle: 'Science · Class 10-A',
-      avatarName: 'Ms. Joshi',
-      unreadCount: 2,
-      lastMessage: 'Please remind students to bring lab coat.',
-      updatedAt: iso(new Date(now.getTime() - 1000 * 60 * 10)),
-    },
-    {
-      id: 'C-2',
-      title: 'Parents Group (10-A)',
-      subtitle: 'Broadcast',
-      avatarName: 'Parents Group',
-      unreadCount: 0,
-      lastMessage: 'Tomorrow is PTM at 10:00 AM.',
-      updatedAt: iso(new Date(now.getTime() - 1000 * 60 * 30)),
-    },
-    {
-      id: 'C-3',
-      title: 'Mr. Verma',
-      subtitle: 'Mathematics · Class 10-A',
-      avatarName: 'Mr. Verma',
-      unreadCount: 1,
-      lastMessage: 'Share the algebra worksheet link.',
-      updatedAt: iso(new Date(now.getTime() - 1000 * 60 * 55)),
-    },
-  ];
+interface BackendConversationDetail {
+  id: string;
+  title: string;
+  isGroup: boolean;
+  participants: Array<{ id: string; name: string; avatar?: string }>;
+  updatedAt: string;
+}
 
-  messageStore = [
-    {
-      id: 'M-1',
-      conversationId: 'C-1',
-      direction: 'in',
-      sender: 'Ms. Joshi',
-      text: 'Hi, can you ensure lab coats for tomorrow?',
-      at: iso(new Date(now.getTime() - 1000 * 60 * 40)),
-    },
-    {
-      id: 'M-2',
-      conversationId: 'C-1',
-      direction: 'out',
-      sender: 'Admin',
-      text: 'Sure. I’ll notify the class.',
-      at: iso(new Date(now.getTime() - 1000 * 60 * 35)),
-    },
-    {
-      id: 'M-3',
-      conversationId: 'C-1',
-      direction: 'in',
-      sender: 'Ms. Joshi',
-      text: 'Please remind students to bring lab coat.',
-      at: iso(new Date(now.getTime() - 1000 * 60 * 10)),
-    },
-    {
-      id: 'M-4',
-      conversationId: 'C-3',
-      direction: 'in',
-      sender: 'Mr. Verma',
-      text: 'Share the algebra worksheet link.',
-      at: iso(new Date(now.getTime() - 1000 * 60 * 55)),
-    },
-    {
-      id: 'M-5',
-      conversationId: 'C-2',
-      direction: 'out',
-      sender: 'Admin',
-      text: 'Tomorrow is PTM at 10:00 AM.',
-      at: iso(new Date(now.getTime() - 1000 * 60 * 30)),
-    },
-  ];
+function toConversationRecord(c: {
+  id: string;
+  title: string;
+  subtitle?: string;
+  avatarName?: string;
+  unreadCount?: number;
+  lastMessage?: string;
+  updatedAt: string;
+}): ConversationRecord {
+  return {
+    id: c.id,
+    title: c.title,
+    subtitle: c.subtitle ?? '',
+    avatarName: c.avatarName ?? (c.title ?? '?')[0],
+    unreadCount: c.unreadCount ?? 0,
+    lastMessage: c.lastMessage ?? '',
+    updatedAt: c.updatedAt,
+  };
+}
+
+function toConversationDetail(c: BackendConversationDetail): ConversationRecord {
+  return {
+    id: c.id,
+    title: c.title,
+    subtitle: c.participants.map((p) => p.name).join(', '),
+    avatarName: (c.title ?? '?')[0],
+    unreadCount: 0,
+    lastMessage: '',
+    updatedAt: c.updatedAt,
+  };
 }
 
 export const useGetConversations = () =>
   useQuery({
     queryKey: [API, 'conversations'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...conversationStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<
+          ApiResponse<
+            Array<{
+              id: string;
+              title: string;
+              subtitle: string;
+              avatarName: string;
+              unreadCount: number;
+              lastMessage: string;
+              updatedAt: string;
+            }>
+          >
+        >(`${API}/conversations`)
+        .then(unwrapApi);
+      return (res ?? [])
+        .map(toConversationRecord)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -120,9 +104,11 @@ export const useGetConversationById = ({ conversationId }: { conversationId?: st
   useQuery({
     queryKey: [API, 'conversations', conversationId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return conversationStore.find((c) => c.id === conversationId) ?? null;
+      if (!conversationId) return null;
+      const res = await apiClient
+        .get<ApiResponse<BackendConversationDetail>>(`${API}/conversations/${conversationId}`)
+        .then(unwrapApi);
+      return res ? toConversationDetail(res) : null;
     },
     enabled: !!conversationId,
   });
@@ -131,37 +117,40 @@ export const useGetMessagesByConversation = ({ conversationId }: { conversationI
   useQuery({
     queryKey: [API, 'messages', conversationId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return messageStore
-        .filter((m) => m.conversationId === conversationId)
+      if (!conversationId) return [];
+      const res = await apiClient
+        .get<ApiResponse<BackendMessage[]>>(`${API}/conversations/${conversationId}/messages`)
+        .then(unwrapApi);
+      return (res ?? [])
+        .map((m) => ({
+          id: m.id,
+          conversationId: m.conversationId,
+          direction: m.direction,
+          sender: m.sender,
+          text: m.text,
+          at: m.at,
+        }))
         .sort((a, b) => a.at.localeCompare(b.at));
     },
     enabled: !!conversationId,
   });
 
 export const useSendMessage = () =>
-  useAppMutation({
-    mutationFn: async (body: { conversationId: string; text: string }) => {
-      await mockDelay(180);
-      ensureSeed();
-      const conv = conversationStore.find((c) => c.id === body.conversationId);
-      if (!conv) throw new Error('Conversation not found');
-      const msg: ChatMessage = {
-        id: `M-${messageStore.length + 1}`,
-        conversationId: body.conversationId,
-        direction: 'out',
-        sender: 'Admin',
-        text: body.text,
-        at: new Date().toISOString(),
+  useAppMutation<ChatMessage, { conversationId: string; text: string }>({
+    mutationFn: async (body) => {
+      const msg = await apiClient
+        .post<ApiResponse<BackendMessage>>(`${API}/conversations/${body.conversationId}/messages`, {
+          content: body.text,
+        })
+        .then(unwrapApi);
+      return {
+        id: msg.id,
+        conversationId: msg.conversationId,
+        direction: msg.direction,
+        sender: msg.sender,
+        text: msg.text,
+        at: msg.at,
       };
-      messageStore = [...messageStore, msg];
-      conversationStore = conversationStore.map((c) =>
-        c.id === body.conversationId
-          ? { ...c, lastMessage: body.text, updatedAt: msg.at, unreadCount: 0 }
-          : c
-      );
-      return msg;
     },
     successMsg: 'Message sent',
     errorMsg: 'Failed to send message',
@@ -170,13 +159,9 @@ export const useSendMessage = () =>
   });
 
 export const useMarkConversationRead = () =>
-  useAppMutation({
-    mutationFn: async (body: { conversationId: string }) => {
-      await mockDelay(80);
-      ensureSeed();
-      conversationStore = conversationStore.map((c) =>
-        c.id === body.conversationId ? { ...c, unreadCount: 0 } : c
-      );
+  useAppMutation<{ conversationId: string }, { conversationId: string }>({
+    mutationFn: async (body) => {
+      await apiClient.patch(`${API}/conversations/${body.conversationId}/read`);
       return { conversationId: body.conversationId };
     },
     successMsg: 'Marked as read',
@@ -185,4 +170,3 @@ export const useMarkConversationRead = () =>
     onSuccessNotificationVisible: false,
     onErrorNotificationVisible: false,
   });
-

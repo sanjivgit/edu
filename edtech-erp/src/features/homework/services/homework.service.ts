@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import apiClient, { unwrapApi } from '@/lib/apiClient';
+import type { ApiResponse } from '@/types';
 import { useAppMutation } from '@/reactQueryConfig/hooks/useAppMutation';
-import { mockDelay } from '@/shared/utils';
+import { findSubjectIdByName, resolveClassDisplayMap, resolveClassId } from '@/features/common/services/lookups.service';
 
 export type HomeworkStatus = 'draft' | 'assigned' | 'closed';
 
@@ -29,62 +31,59 @@ export interface HomeworkSubmission {
 }
 
 const API = '/homework';
-let homeworkStore: HomeworkRecord[] = [];
-let submissionStore: HomeworkSubmission[] = [];
 
-function ensureSeed() {
-  if (homeworkStore.length) return;
-  const today = new Date();
-  const iso = (d: Date) => d.toISOString().split('T')[0];
-  const now = new Date().toISOString();
-  const assigned = iso(today);
-  const due = iso(new Date(today.getTime() + 1000 * 60 * 60 * 24 * 2));
+interface BackendHomework {
+  id: string;
+  title: string;
+  description: string;
+  classId: string;
+  className?: string;
+  section: string | null;
+  subjectId: string | null;
+  subject?: { id: string; name: string } | null;
+  subjectName?: string;
+  assignedDate: string;
+  dueDate: string;
+  status: HomeworkStatus;
+  attachments: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-  homeworkStore = [
-    {
-      id: 'HW-1',
-      title: 'Algebra Practice Worksheet',
-      description: 'Solve Q1–Q20 from the worksheet. Show steps clearly.',
-      classId: '10',
-      section: 'A',
-      subject: 'Mathematics',
-      assignedDate: assigned,
-      dueDate: due,
-      status: 'assigned',
-      attachments: ['worksheet-algebra.pdf'],
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: 'HW-2',
-      title: 'Science Lab Report',
-      description: 'Write a 1-page report on the recent lab experiment (Aim, Procedure, Observations, Conclusion).',
-      classId: '10',
-      section: 'A',
-      subject: 'Science',
-      assignedDate: assigned,
-      dueDate: due,
-      status: 'draft',
-      attachments: [],
-      createdAt: now,
-      updatedAt: now,
-    },
-  ];
+function classDisplay(classId: string, className?: string, classMap?: Map<string, string>): string {
+  const m = (className ?? '').match(/(\d+)/);
+  if (m) return m[1];
+  if (classMap && classMap.size) return classMap.get(classId) ?? classId;
+  return classId;
+}
 
-  submissionStore = [
-    { id: 'SUBM-1', homeworkId: 'HW-1', student: 'Aarav Sharma', rollNo: '010', submittedAt: new Date().toISOString(), status: 'submitted' },
-    { id: 'SUBM-2', homeworkId: 'HW-1', student: 'Priya Patel', rollNo: '011', submittedAt: new Date().toISOString(), status: 'late' },
-    { id: 'SUBM-3', homeworkId: 'HW-1', student: 'Riya Singh', rollNo: '012', submittedAt: '', status: 'missing' },
-  ];
+function toHomeworkRecord(h: BackendHomework, classMap?: Map<string, string>): HomeworkRecord {
+  return {
+    id: h.id,
+    title: h.title,
+    description: h.description ?? '',
+    classId: classDisplay(h.classId, h.className, classMap),
+    section: h.section ?? '',
+    subject: h.subject?.name ?? h.subjectName ?? '',
+    assignedDate: h.assignedDate,
+    dueDate: h.dueDate,
+    status: h.status,
+    attachments: h.attachments ?? [],
+    createdAt: h.createdAt,
+    updatedAt: h.updatedAt,
+  };
 }
 
 export const useGetHomework = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      await mockDelay(150);
-      ensureSeed();
-      return [...homeworkStore].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      const res = await apiClient
+        .get<ApiResponse<{ items: BackendHomework[] }>>('/homework', { params: { limit: 500 } })
+        .then(unwrapApi);
+      const items = res?.items ?? [];
+      const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
+      return items.map((i) => toHomeworkRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
   });
 
@@ -92,9 +91,11 @@ export const useGetHomeworkById = ({ homeworkId }: { homeworkId?: string }) =>
   useQuery({
     queryKey: [API, 'detail', homeworkId],
     queryFn: async () => {
-      await mockDelay(120);
-      ensureSeed();
-      return homeworkStore.find((h) => h.id === homeworkId) ?? null;
+      if (!homeworkId) return null;
+      const h = await apiClient
+        .get<ApiResponse<BackendHomework & { class_?: { name: string } }>>(`/homework/${homeworkId}`)
+        .then(unwrapApi);
+      return toHomeworkRecord({ ...h, className: h.class_?.name });
     },
     enabled: !!homeworkId,
   });
@@ -103,28 +104,65 @@ export const useGetHomeworkSubmissions = ({ homeworkId }: { homeworkId?: string 
   useQuery({
     queryKey: [API, 'submissions', homeworkId],
     queryFn: async () => {
-      await mockDelay(140);
-      ensureSeed();
-      return submissionStore.filter((s) => s.homeworkId === homeworkId);
+      if (!homeworkId) return [];
+      const res = await apiClient
+        .get<
+          ApiResponse<
+            Array<{
+              id: string;
+              homeworkId: string;
+              student: { name: string; rollNo: string };
+              submittedAt: string;
+              status: 'submitted' | 'missing' | 'late';
+            }>
+          >
+        >(`/homework/${homeworkId}/submissions`)
+        .then(unwrapApi);
+      return (res ?? []).map((s) => ({
+        id: s.id,
+        homeworkId: s.homeworkId,
+        student: s.student?.name ?? 'Unknown',
+        rollNo: s.student?.rollNo ?? '',
+        submittedAt: s.submittedAt ?? '',
+        status: s.status,
+      }));
     },
     enabled: !!homeworkId,
   });
 
 export const useCreateHomework = () =>
-  useAppMutation({
-    mutationFn: async (body: Omit<HomeworkRecord, 'id' | 'status' | 'createdAt' | 'updatedAt'> & { status?: HomeworkStatus }) => {
-      await mockDelay(220);
-      ensureSeed();
-      const now = new Date().toISOString();
-      const created: HomeworkRecord = {
-        id: `HW-${homeworkStore.length + 1}`,
-        status: body.status ?? 'assigned',
-        createdAt: now,
-        updatedAt: now,
-        ...body,
-      };
-      homeworkStore = [created, ...homeworkStore];
-      return created;
+  useAppMutation<
+    HomeworkRecord,
+    {
+      title: string;
+      description: string;
+      classId: string;
+      section: string;
+      subject: string;
+      assignedDate: string;
+      dueDate: string;
+      status?: HomeworkStatus;
+      attachments?: string[];
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const subjectId = await findSubjectIdByName(body.subject);
+      const created = await apiClient
+        .post<ApiResponse<BackendHomework>>('/homework', {
+          title: body.title,
+          description: body.description,
+          classId,
+          section: body.section || undefined,
+          subjectId,
+          assignedDate: body.assignedDate,
+          dueDate: body.dueDate,
+          status: body.status ?? 'assigned',
+          attachments: body.attachments ?? [],
+        })
+        .then(unwrapApi);
+      return toHomeworkRecord(created);
     },
     successMsg: 'Homework created successfully',
     errorMsg: 'Failed to create homework',
@@ -132,15 +170,39 @@ export const useCreateHomework = () =>
   });
 
 export const useUpdateHomework = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string } & Partial<Omit<HomeworkRecord, 'id' | 'createdAt'>>) => {
-      await mockDelay(200);
-      ensureSeed();
-      const current = homeworkStore.find((h) => h.id === body.id);
-      if (!current) throw new Error('Homework not found');
-      const next: HomeworkRecord = { ...current, ...body, updatedAt: new Date().toISOString() };
-      homeworkStore = homeworkStore.map((h) => (h.id === body.id ? next : h));
-      return next;
+  useAppMutation<
+    HomeworkRecord,
+    {
+      id: string;
+      title: string;
+      description: string;
+      classId: string;
+      section: string;
+      subject: string;
+      assignedDate: string;
+      dueDate: string;
+      status: HomeworkStatus;
+      attachments?: string[];
+    }
+  >({
+    mutationFn: async (body) => {
+      const classId = await resolveClassId(body.classId);
+      if (!classId) throw new Error('Class not found');
+      const subjectId = await findSubjectIdByName(body.subject);
+      const updated = await apiClient
+        .put<ApiResponse<BackendHomework>>(`/homework/${body.id}`, {
+          title: body.title,
+          description: body.description,
+          classId,
+          section: body.section || undefined,
+          subjectId,
+          assignedDate: body.assignedDate,
+          dueDate: body.dueDate,
+          status: body.status,
+          attachments: body.attachments ?? [],
+        })
+        .then(unwrapApi);
+      return toHomeworkRecord(updated);
     },
     successMsg: 'Homework updated successfully',
     errorMsg: 'Failed to update homework',
@@ -148,12 +210,9 @@ export const useUpdateHomework = () =>
   });
 
 export const useDeleteHomework = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(160);
-      ensureSeed();
-      homeworkStore = homeworkStore.filter((h) => h.id !== body.id);
-      submissionStore = submissionStore.filter((s) => s.homeworkId !== body.id);
+  useAppMutation<{ id: string }, { id: string }>({
+    mutationFn: async (body) => {
+      await apiClient.delete(`/homework/${body.id}`);
       return { id: body.id };
     },
     successMsg: 'Homework deleted successfully',
@@ -162,18 +221,14 @@ export const useDeleteHomework = () =>
   });
 
 export const useCloseHomework = () =>
-  useAppMutation({
-    mutationFn: async (body: { id: string }) => {
-      await mockDelay(180);
-      ensureSeed();
-      const current = homeworkStore.find((h) => h.id === body.id);
-      if (!current) throw new Error('Homework not found');
-      const next: HomeworkRecord = { ...current, status: 'closed', updatedAt: new Date().toISOString() };
-      homeworkStore = homeworkStore.map((h) => (h.id === body.id ? next : h));
-      return next;
+  useAppMutation<HomeworkRecord, { id: string }>({
+    mutationFn: async (body) => {
+      const updated = await apiClient
+        .patch<ApiResponse<BackendHomework>>(`/homework/${body.id}/close`)
+        .then(unwrapApi);
+      return toHomeworkRecord(updated);
     },
     successMsg: 'Homework closed successfully',
     errorMsg: 'Failed to close homework',
     invalidateQueryKeys: [[API, 'list'], [API, 'detail']],
   });
-
