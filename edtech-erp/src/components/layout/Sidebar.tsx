@@ -1,25 +1,86 @@
-import React, { useState, useMemo } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useState, useMemo } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, UserPlus, UserRound, School, BookOpen, CalendarDays, ClipboardCheck,
-  BookMarked, PenLine, GraduationCap, Layers, CreditCard, FileText, Bus,
-  Bell, NotebookPen, Palmtree, MessageSquare, BellRing, Video, PlayCircle,
-  Image, BarChart3, Shield, ScrollText, Settings, Package, Building2, ChevronDown, ChevronRight,
-  X, Zap,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useAuth, useTheme } from '@/hooks';
-import { buildNavItems, NAV_GROUPS, NAV_GROUP_MAP } from '@/config/modules.config';
-import type { NavItem } from '@/types';
+  LayoutDashboard,
+  UserPlus,
+  UserRound,
+  School,
+  BookOpen,
+  CalendarDays,
+  ClipboardCheck,
+  BookMarked,
+  PenLine,
+  GraduationCap,
+  Layers,
+  CreditCard,
+  FileText,
+  Bus,
+  Bell,
+  NotebookPen,
+  Palmtree,
+  MessageSquare,
+  BellRing,
+  Video,
+  PlayCircle,
+  Image,
+  BarChart3,
+  Shield,
+  ScrollText,
+  Settings,
+  Package,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Zap,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth, useTheme } from "@/hooks";
+import {
+  buildNavItems,
+  NAV_GROUPS,
+  NAV_GROUP_MAP,
+} from "@/config/modules.config";
+import type { NavItem } from "@/types";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  LayoutDashboard, UserPlus, UserRound, School, BookOpen, CalendarDays, ClipboardCheck,
-  BookMarked, PenLine, GraduationCap, Layers, CreditCard, FileText, Bus,
-  Bell, NotebookPen, Palmtree, MessageSquare, BellRing, Video, PlayCircle,
-  Image, BarChart3, Shield, ScrollText, Settings, Package, Building2,
+  LayoutDashboard,
+  UserPlus,
+  UserRound,
+  School,
+  BookOpen,
+  CalendarDays,
+  ClipboardCheck,
+  BookMarked,
+  PenLine,
+  GraduationCap,
+  Layers,
+  CreditCard,
+  FileText,
+  Bus,
+  Bell,
+  NotebookPen,
+  Palmtree,
+  MessageSquare,
+  BellRing,
+  Video,
+  PlayCircle,
+  Image,
+  BarChart3,
+  Shield,
+  ScrollText,
+  Settings,
+  Package,
+  Building2,
 };
 
-function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavItemComponent({
+  item,
+  collapsed,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+}) {
   const location = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const Icon = ICON_MAP[item.icon] ?? LayoutDashboard;
@@ -32,10 +93,10 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
-            'flex items-center w-full gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+            "flex items-center w-full gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
             isActive
-              ? 'bg-sidebar-accent text-white'
-              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+              ? "bg-sidebar-accent text-white"
+              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
           )}
         >
           <Icon className="h-[18px] w-[18px] flex-shrink-0" />
@@ -58,10 +119,10 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
                 to={child.path}
                 className={({ isActive: a }) =>
                   cn(
-                    'flex items-center gap-2 px-2 py-2 rounded-md text-xs font-medium transition-all',
+                    "flex items-center gap-2 px-2 py-2 rounded-md text-xs font-medium transition-all",
                     a
-                      ? 'text-white bg-sidebar-accent'
-                      : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40'
+                      ? "text-white bg-sidebar-accent"
+                      : "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/40"
                   )
                 }
               >
@@ -80,10 +141,10 @@ function NavItemComponent({ item, collapsed }: { item: NavItem; collapsed: boole
       title={collapsed ? item.label : undefined}
       className={({ isActive: a }) =>
         cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative',
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group relative",
           a
-            ? 'bg-sidebar-accent text-white shadow-sm'
-            : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            ? "bg-sidebar-accent text-white shadow-sm"
+            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
         )
       }
     >
@@ -123,9 +184,11 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
 
   const groupedItems = useMemo(() => {
     const groups: Record<string, NavItem[]> = {};
-    NAV_GROUPS.forEach((g) => { groups[g.id] = []; });
+    NAV_GROUPS.forEach((g) => {
+      groups[g.id] = [];
+    });
     navItems.forEach((item) => {
-      const groupId = NAV_GROUP_MAP[item.id] ?? 'overview';
+      const groupId = NAV_GROUP_MAP[item.id] ?? "overview";
       if (!groups[groupId]) groups[groupId] = [];
       groups[groupId].push(item);
     });
@@ -135,8 +198,8 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const sidebarContent = (
     <div
       className={cn(
-        'flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300',
-        sidebarCollapsed ? 'w-[68px]' : 'w-64'
+        "flex flex-col h-full bg-sidebar border-r border-sidebar-border transition-all duration-300",
+        sidebarCollapsed ? "w-[68px]" : "w-64"
       )}
     >
       {/* Logo */}
@@ -147,7 +210,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
         {!sidebarCollapsed && (
           <div className="min-w-0">
             <p className="font-display font-bold text-sm text-sidebar-foreground truncate">
-              {branding?.instituteName ?? 'EduCore ERP'}
+              {branding?.instituteName ?? "EduCore ERP"}
             </p>
             <p className="text-[10px] text-sidebar-foreground/40 uppercase tracking-widest">
               School Management
@@ -196,12 +259,16 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
           <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30">
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-primary">
-                {user.name.charAt(0).toUpperCase()}
+                {user.name?.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
-              <p className="text-[10px] text-sidebar-foreground/40 capitalize">{user.role}</p>
+              <p className="text-sm font-medium text-sidebar-foreground truncate">
+                {user.name}
+              </p>
+              <p className="text-[10px] text-sidebar-foreground/40 capitalize">
+                {user.role}
+              </p>
             </div>
           </div>
         </div>
@@ -212,12 +279,19 @@ export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden lg:block flex-shrink-0 relative z-30">{sidebarContent}</div>
+      <div className="hidden lg:block flex-shrink-0 relative z-30">
+        {sidebarContent}
+      </div>
       {/* Mobile sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
-          <div className="absolute inset-0 bg-black/50" onClick={onMobileClose} />
-          <div className="relative z-10 animate-slide-in-left">{sidebarContent}</div>
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={onMobileClose}
+          />
+          <div className="relative z-10 animate-slide-in-left">
+            {sidebarContent}
+          </div>
         </div>
       )}
     </>

@@ -48,6 +48,7 @@ export function formatNumber(n: number, locale = 'en-IN'): string {
 
 // ─── String helpers ─────────────────────────────────────────────────────────────
 export function initials(name: string): string {
+  if (!name) return "Un"
   return name
     .split(' ')
     .slice(0, 2)
@@ -171,6 +172,8 @@ export function avatarColor(name: string): string {
     'bg-violet-500', 'bg-blue-500', 'bg-emerald-500',
     'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-pink-500',
   ];
-  const index = name.charCodeAt(0) % colors.length;
+  if (!name) return colors[0];
+
+  const index = name?.charCodeAt(0) % colors.length;
   return colors[index];
 }
