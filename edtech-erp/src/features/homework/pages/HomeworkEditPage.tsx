@@ -49,6 +49,7 @@ export default function HomeworkEditPage() {
         subject: values.subject,
         assignedDate: values.assignedDate,
         dueDate: values.dueDate,
+        academicYearId: values.academicYearId ?? homework.academicYearId ?? null,
         status: values.status ?? homework.status,
         attachments: values.attachments ?? [],
       } as any,

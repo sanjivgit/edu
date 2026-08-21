@@ -17,6 +17,7 @@ import {
   CreateSectionDto,
   UpdateSectionDto,
   CreateAcademicYearDto,
+  UpdateAcademicYearDto,
   PromoteStudentsDto,
   AutoPromoteDto,
 } from './dto/class.dto';
@@ -90,6 +91,18 @@ export class ClassesController {
   @Roles(UserRole.superadmin, UserRole.admin)
   createAcademicYear(@Body() dto: CreateAcademicYearDto, @CurrentUser('tenantId') tenantId?: string) {
     return this.classesService.createAcademicYear(dto, tenantId);
+  }
+
+  @Put('academic-years/:id')
+  @Roles(UserRole.superadmin, UserRole.admin)
+  updateAcademicYear(@Param('id') id: string, @Body() dto: UpdateAcademicYearDto) {
+    return this.classesService.updateAcademicYear(id, dto);
+  }
+
+  @Delete('academic-years/:id')
+  @Roles(UserRole.superadmin, UserRole.admin)
+  removeAcademicYear(@Param('id') id: string) {
+    return this.classesService.removeAcademicYear(id);
   }
 
   @Post('classes/promote')

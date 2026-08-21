@@ -45,6 +45,7 @@ export default function AssessmentEditPage() {
         totalMarks: values.totalMarks,
         date: values.date,
         instructions: values.instructions ?? '',
+        academicYearId: values.academicYearId ?? assessment.academicYearId ?? null,
         status: values.status ?? assessment.status,
       },
       { onSuccess: (updated) => navigate(`/assessment/${updated.id}`) }

@@ -10,6 +10,7 @@ export const createSyllabusSchema = yup.object({
   classId: yup.string().required('Class is required'),
   section: yup.string().required('Section is required'),
   subject: yup.string().trim().required('Subject is required'),
+  academicYearId: yup.string().nullable().optional(),
   term: yup.string().oneOf(['term-1', 'term-2', 'final']).required('Term is required'),
   description: yup.string().nullable().default(''),
   attachments: yup.array(syllabusAttachmentSchema).default([]).required(),

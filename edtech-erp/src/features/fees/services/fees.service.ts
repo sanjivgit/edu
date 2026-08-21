@@ -6,7 +6,7 @@ import { findStudentIdByName } from '@/features/common/services/lookups.service'
 
 export type FeeStatus = 'paid' | 'pending' | 'overdue';
 export type FeeType = 'tuition' | 'transport' | 'lab' | 'library' | 'exam';
-export type PaymentMode = 'cash' | 'online' | 'cheque' | 'dd';
+export type PaymentMode = 'cash' | 'online' | 'cheque' | 'dd' | 'razorpay';
 
 export interface FeeRecord {
   id: string;
@@ -14,6 +14,8 @@ export interface FeeRecord {
   studentName: string;
   rollNo: string;
   className: string;
+  classId?: string;
+  section?: string;
   feeType: FeeType;
   amount: number;
   dueDate: string;
@@ -24,6 +26,89 @@ export interface FeeRecord {
   referenceId?: string;
 }
 
+export interface FeeFilters {
+  classId?: string;
+  section?: string;
+  academicYearId?: string;
+  status?: string;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  feeId?: string;
+  feeType: string;
+  feeName?: string;
+  amount: number;
+  dueDate?: string;
+  paidDate?: string;
+  month?: string;
+  status: string;
+  receiptNo?: string;
+  paymentMode?: string;
+  referenceId?: string;
+}
+
+export interface StudentPaymentHistory {
+  student: {
+    id: string;
+    name: string;
+    rollNo: string;
+    className: string;
+    section?: string;
+    academicYearName?: string;
+  };
+  summary: {
+    totalPaid: number;
+    totalPending: number;
+    totalOverdue: number;
+    totalDues: number;
+  };
+  payments: PaymentHistoryItem[];
+  pendingFees: Array<{
+    id: string;
+    feeId: string;
+    feeType: string;
+    feeName?: string;
+    amount: number;
+    dueDate: string;
+    status: string;
+  }>;
+}
+
+export interface ParentChildFee {
+  student: {
+    id: string;
+    name: string;
+    rollNo: string;
+    className: string;
+    section?: string;
+    academicYearName?: string;
+  };
+  summary: {
+    totalPaid: number;
+    totalPending: number;
+    totalOverdue: number;
+    totalDues: number;
+  };
+  recentPayments: Array<{
+    id: string;
+    amount: number;
+    paidDate?: string;
+    mode?: string;
+    receiptNo?: string;
+    feeType?: string;
+  }>;
+  pendingFees: Array<{
+    id: string;
+    feeId: string;
+    feeType: string;
+    feeName?: string;
+    amount: number;
+    dueDate: string;
+    status: string;
+  }>;
+}
+
 const API = '/fees';
 
 interface BackendPayment {
@@ -32,6 +117,8 @@ interface BackendPayment {
   studentName: string;
   rollNo: string;
   className: string;
+  classId?: string;
+  section?: string;
   feeType: string;
   amount: number | string;
   dueDate?: string;
@@ -50,6 +137,8 @@ function toFeeRecord(p: BackendPayment): FeeRecord {
     studentName: p.studentName,
     rollNo: p.rollNo,
     className: p.className ?? '',
+    classId: p.classId,
+    section: p.section,
     feeType: (p.feeType ?? 'other') as FeeType,
     amount: Number(p.amount),
     dueDate: p.dueDate ?? new Date().toISOString().split('T')[0],
@@ -61,12 +150,17 @@ function toFeeRecord(p: BackendPayment): FeeRecord {
   };
 }
 
-export const useGetFees = () =>
+export const useGetFees = (filters?: FeeFilters) =>
   useQuery({
-    queryKey: [API, 'list'],
+    queryKey: [API, 'list', filters],
     queryFn: async () => {
+      const params: Record<string, string> = { limit: '500' };
+      if (filters?.classId) params.classId = filters.classId;
+      if (filters?.section) params.section = filters.section;
+      if (filters?.academicYearId) params.academicYearId = filters.academicYearId;
+      if (filters?.status) params.status = filters.status;
       const res = await apiClient
-        .get<ApiResponse<BackendPayment[]>>('/fees/payments', { params: { limit: 500 } })
+        .get<ApiResponse<BackendPayment[]>>(`${API}/payments`, { params })
         .then(unwrapApi);
       return (res ?? []).map(toFeeRecord);
     },
@@ -88,7 +182,7 @@ export const useGetFeeById = ({ feeId }: { feeId?: string }) =>
           receiptNo?: string;
           mode?: PaymentMode;
           referenceId?: string;
-        }>>(`/fees/payments/${feeId}`)
+        }>>(`${API}/payments/${feeId}`)
         .then(unwrapApi);
       return toFeeRecord({
         id: res.id,
@@ -109,6 +203,29 @@ export const useGetFeeById = ({ feeId }: { feeId?: string }) =>
     enabled: !!feeId,
   });
 
+export const useGetStudentPaymentHistory = (studentId: string) =>
+  useQuery({
+    queryKey: [API, 'student-history', studentId],
+    queryFn: async () => {
+      const res = await apiClient
+        .get<ApiResponse<StudentPaymentHistory>>(`${API}/payments/student/${studentId}`)
+        .then(unwrapApi);
+      return res as StudentPaymentHistory;
+    },
+    enabled: !!studentId,
+  });
+
+export const useGetParentFees = () =>
+  useQuery({
+    queryKey: [API, 'parent-fees'],
+    queryFn: async () => {
+      const res = await apiClient
+        .get<ApiResponse<{ children: ParentChildFee[]; totalPending: number; totalOverdue: number }>>(`${API}/parent/child-fees`)
+        .then(unwrapApi);
+      return res as { children: ParentChildFee[]; totalPending: number; totalOverdue: number };
+    },
+  });
+
 export const useRecordPayment = () =>
   useAppMutation<
     FeeRecord,
@@ -122,7 +239,7 @@ export const useRecordPayment = () =>
   >({
     mutationFn: async (body) => {
       const existing = await apiClient
-        .get<ApiResponse<{ studentId: string; feeId: string | null }>>(`/fees/payments/${body.feeId}`)
+        .get<ApiResponse<{ studentId: string; feeId: string | null }>>(`${API}/payments/${body.feeId}`)
         .then(unwrapApi);
       const res = await apiClient
         .post<
@@ -133,7 +250,7 @@ export const useRecordPayment = () =>
               mode?: PaymentMode;
             }
           >
-        >('/fees/payments', {
+        >(`${API}/payments`, {
           studentId: existing.studentId,
           feeId: existing.feeId ?? undefined,
           amount: body.amount,
@@ -163,6 +280,52 @@ export const useRecordPayment = () =>
     invalidateQueryKeys: [[API, 'list']],
   });
 
+export const useRecordDirectPayment = () =>
+  useAppMutation<
+    FeeRecord,
+    {
+      studentId: string;
+      feeId?: string;
+      amount: number;
+      paymentMode: PaymentMode;
+      paymentDate: string;
+      referenceId?: string;
+      remarks?: string;
+    }
+  >({
+    mutationFn: async (body) => {
+      const res = await apiClient
+        .post<ApiResponse<BackendPayment>>(`${API}/payments`, {
+          studentId: body.studentId,
+          feeId: body.feeId,
+          amount: body.amount,
+          paidDate: body.paymentDate,
+          mode: body.paymentMode,
+          referenceId: body.referenceId,
+          remarks: body.remarks,
+        })
+        .then(unwrapApi);
+      return toFeeRecord({
+        id: res.id,
+        studentId: res.studentId,
+        studentName: res.studentName ?? '',
+        rollNo: res.rollNo ?? '',
+        className: res.className ?? '',
+        feeType: res.feeType ?? 'other',
+        amount: res.amount,
+        dueDate: res.dueDate,
+        paidDate: res.paidDate,
+        status: res.status,
+        receiptNo: res.receiptNo,
+        paymentMode: res.paymentMode ?? res.mode,
+        referenceId: res.referenceId,
+      });
+    },
+    successMsg: 'Payment recorded successfully',
+    errorMsg: 'Failed to record payment',
+    invalidateQueryKeys: [[API, 'list'], [API, 'student-history']],
+  });
+
 export const useCreateFeeAndRecordPayment = () =>
   useAppMutation<
     FeeRecord,
@@ -190,7 +353,7 @@ export const useCreateFeeAndRecordPayment = () =>
           };
           fee: { type: FeeType };
           student: { id: string; name: string; rollNo: string; className: string };
-        }>>('/fees/payments/create-fee', {
+        }>>(`${API}/payments/create-fee`, {
           studentId,
           feeType: body.feeType,
           amount: body.amount,

@@ -3,6 +3,7 @@ import { useForm, type FieldPath } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Input, SelectInput, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useGetAcademicYears } from '@/features/classes/services/classes.service';
 import type { AdmissionRecord } from '../services/admission.service';
 import {
   admissionCreateSchema,
@@ -28,12 +29,14 @@ const sectionOptions = ['A', 'B', 'C', 'D'].map((item) => ({ label: `Section ${i
 export function AdmissionForm({ mode, initialData = null, onSubmit, isLoading = false }: AdmissionFormProps) {
   const isEdit = mode === 'edit';
   const [step, setStep] = useState(0);
+  const { data: academicYears = [] } = useGetAcademicYears();
 
   type FormValues = AdmissionCreatePayload | AdmissionUpdatePayload;
 
   const form = useForm<FormValues>({
     resolver: yupResolver(isEdit ? admissionUpdateSchema : admissionCreateSchema),
     defaultValues: {
+      academicYearId: '',
       firstName: '',
       lastName: '',
       dateOfBirth: '',
@@ -202,6 +205,12 @@ export function AdmissionForm({ mode, initialData = null, onSubmit, isLoading = 
             value={form.watch('classApplyingFor')}
             onChange={(event) => form.setValue('classApplyingFor', event.target.value)}
             error={form.formState.errors.classApplyingFor?.message}
+          />
+          <SelectInput
+            label="Academic Year"
+            options={academicYears.map((y) => ({ label: y.name, value: y.id }))}
+            value={form.watch('academicYearId' as any) ?? ''}
+            onChange={(event) => form.setValue('academicYearId' as any, event.target.value || null)}
           />
           <SelectInput
             label="Section Preference"

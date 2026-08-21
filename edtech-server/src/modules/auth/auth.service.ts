@@ -23,7 +23,7 @@ export class AuthService {
   async login(dto: LoginDto, ip?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
-      include: { role_: true, tenant: true },
+      include: { role_: true, tenant: true, student: true, teacher: true },
     });
     if (!user || user.status !== 'active') {
       throw new UnauthorizedException('Invalid credentials');
@@ -272,6 +272,8 @@ export class AuthService {
       isEmailVerified: rest.isEmailVerified,
       permissions: [...new Set([...explicit, ...rolePermissions])],
       meta: rest.meta,
+      studentId: user.student?.id ?? null,
+      teacherId: user.teacher?.id ?? null,
     };
   }
 }

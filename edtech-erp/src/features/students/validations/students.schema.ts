@@ -15,6 +15,7 @@ export const createStudentSchema = yup.object({
   status: yup.string().oneOf(['active', 'inactive', 'transferred']).required('Status is required'),
   classId: yup.string().trim().required('Class is required'),
   section: yup.string().trim().required('Section is required'),
+  currentAcademicYearId: yup.string().nullable().optional(),
 });
 
 export const updateStudentSchema = createStudentSchema.shape({

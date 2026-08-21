@@ -41,6 +41,10 @@ export class CreateHomeworkDto {
   @IsOptional()
   @IsArray()
   attachments?: any[];
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
 }
 
 export class UpdateHomeworkDto extends CreateHomeworkDto {}

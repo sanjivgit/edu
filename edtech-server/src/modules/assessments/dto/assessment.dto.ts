@@ -46,6 +46,10 @@ export class CreateAssessmentDto {
   @IsOptional()
   @IsEnum(AssessmentStatus)
   status?: AssessmentStatus;
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
 }
 
 export class UpdateAssessmentDto extends CreateAssessmentDto {}

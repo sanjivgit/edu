@@ -67,13 +67,21 @@ export class FeesController {
     @Query() query: PaginationDto,
     @Query('status') status?: string,
     @Query('studentId') studentId?: string,
+    @Query('classId') classId?: string,
+    @Query('section') section?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
-    return this.feesService.findAllPayments(query, status, studentId);
+    return this.feesService.findAllPayments(query, status, studentId, classId, section, academicYearId);
   }
 
   @Get('payments/overdue')
   overdue() {
     return this.feesService.overduePayments();
+  }
+
+  @Get('payments/student/:studentId')
+  studentPayments(@Param('studentId') studentId: string) {
+    return this.feesService.findStudentPaymentHistory(studentId);
   }
 
   @Get('payments/:id')
@@ -103,6 +111,11 @@ export class FeesController {
   @Roles(UserRole.superadmin, UserRole.admin)
   reminder(@Param('studentId') studentId: string) {
     return this.feesService.sendReminder(studentId);
+  }
+
+  @Get('parent/child-fees')
+  parentChildFees(@CurrentUser('id') parentId: string) {
+    return this.feesService.findParentChildFees(parentId);
   }
 
   @Get('stats')

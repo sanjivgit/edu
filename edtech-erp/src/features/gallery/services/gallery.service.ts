@@ -81,9 +81,9 @@ export const useGetAlbums = () =>
     queryKey: [API, 'albums'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendAlbum[] }>>(`${API}/albums`, { params: { limit: 500 } })
+        .get<ApiResponse<BackendAlbum[]>>(`${API}/albums`, { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? []).map(toAlbumRecord).sort((a, b) => b.date.localeCompare(a.date));
+      return (res ?? []).map(toAlbumRecord).sort((a, b) => b.date.localeCompare(a.date));
     },
   });
 

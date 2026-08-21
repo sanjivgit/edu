@@ -68,9 +68,9 @@ export const useGetRoles = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendRole[] }>>(API, { params: { limit: 500 } })
+        .get<ApiResponse<BackendRole[]>>(API, { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? []).map(toRoleRecord).sort((a, b) => a.name.localeCompare(b.name));
+      return (res ?? []).map(toRoleRecord).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 

@@ -34,13 +34,26 @@ export interface AcademicYearItem {
   status: 'active' | 'planned' | 'closed';
 }
 
+export interface PromotionStudentInfo {
+  id: string;
+  name: string;
+  rollNo?: string;
+  status: 'promoted' | 'retained';
+  totalMarks?: number | null;
+  passed?: boolean;
+}
+
 export interface PromotionRecord {
   id: string;
   fromClassId: string;
   toClassId: string;
   promotedCount: number;
+  retainedCount: number;
   academicYearId: string;
   promotedOn: string;
+  mode?: 'manual' | 'auto';
+  promotedStudents?: PromotionStudentInfo[];
+  retainedStudents?: PromotionStudentInfo[];
 }
 
 const API = '/classes';
@@ -133,6 +146,66 @@ export const useGetSections = () =>
       }
       return sections;
     },
+  });
+
+export interface ClassStudent {
+  id: string;
+  name: string;
+  rollNo: string;
+  sectionId?: string;
+}
+
+export const useGetStudentsByClass = (classId: string | undefined) =>
+  useQuery({
+    queryKey: [API, 'students', classId],
+    queryFn: async () => {
+      if (!classId) return [];
+      const res = await apiClient
+        .get<ApiResponse<Array<{ id: string; name: string; rollNo?: string; sectionId?: string }>>>(
+          `/classes/${classId}/students`,
+        )
+        .then(unwrapApi);
+      return (res ?? []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        rollNo: s.rollNo ?? '',
+        sectionId: s.sectionId,
+      })) as ClassStudent[];
+    },
+    enabled: !!classId,
+  });
+
+export interface ClassExamItem {
+  id: string;
+  name: string;
+  term: string;
+  passPercentage: number;
+  totalMarks: number;
+}
+
+export const useGetExamsByClass = (classId: string | undefined) =>
+  useQuery({
+    queryKey: [API, 'exams', classId],
+    queryFn: async () => {
+      if (!classId) return [];
+      const res = await apiClient
+        .get<ApiResponse<Array<{
+          id: string;
+          name: string;
+          term: string;
+          passPercentage?: number;
+          papers?: Array<{ totalMarks: number }>;
+        }>>>(`/exams/schedule/${classId}`)
+        .then(unwrapApi);
+      return (res ?? []).map((e) => ({
+        id: e.id,
+        name: e.name,
+        term: e.term,
+        passPercentage: e.passPercentage ?? 35,
+        totalMarks: e.papers?.reduce((sum, p) => sum + (p.totalMarks || 0), 0) || 100,
+      })) as ClassExamItem[];
+    },
+    enabled: !!classId,
   });
 
 export const useGetClassById = ({ classId }: { classId?: string }) =>
@@ -288,19 +361,42 @@ export const useCreateAcademicYear = () =>
     invalidateQueryKeys: [[API, 'academic-years']],
   });
 
+export const useUpdateAcademicYear = () =>
+  useAppMutation<AcademicYearItem, { id: string; payload: Partial<Omit<AcademicYearItem, 'id'>> }>({
+    mutationFn: async ({ id, payload }) => {
+      const updated = await apiClient
+        .put<ApiResponse<BackendAcademicYear>>(`/academic-years/${id}`, {
+          name: payload.name,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          status: payload.status,
+        })
+        .then(unwrapApi);
+      return updated as AcademicYearItem;
+    },
+    successMsg: 'Academic year updated successfully',
+    errorMsg: 'Failed to update academic year',
+    invalidateQueryKeys: [[API, 'academic-years']],
+  });
+
+export const useDeleteAcademicYear = () =>
+  useAppMutation<{ id: string }, string>({
+    mutationFn: async (id) => {
+      await apiClient.delete(`/academic-years/${id}`);
+      return { id };
+    },
+    successMsg: 'Academic year deleted successfully',
+    errorMsg: 'Failed to delete academic year',
+    invalidateQueryKeys: [[API, 'academic-years']],
+  });
+
 export const usePromoteStudents = () =>
   useAppMutation<
     PromotionRecord,
-    { fromClassId: string; toClassId: string; promotedCount: number; academicYearId: string }
+    { fromClassId: string; toClassId: string; promotedCount: number; academicYearId: string; studentIds?: string[] }
   >({
     mutationFn: async (body) => {
-      let studentIds: string[] | undefined;
-      if (body.promotedCount > 0) {
-        const roster = await apiClient
-          .get<ApiResponse<Array<{ id: string }>>>(`/classes/${body.fromClassId}/students`)
-          .then(unwrapApi);
-        studentIds = roster.slice(0, body.promotedCount).map((s) => s.id);
-      }
+      const studentIds = body.studentIds?.length ? body.studentIds : undefined;
       const res = await apiClient
         .post<ApiResponse<{
           mode: string;
@@ -308,6 +404,8 @@ export const usePromoteStudents = () =>
           promotedCount: number;
           retainedCount: number;
           promotion?: { id: string; promotedOn: string };
+          promotedStudents?: Array<{ id: string; name: string; rollNo?: string; status?: string }>;
+          retainedStudents?: Array<{ id: string; name: string; rollNo?: string; status?: string }>;
         }>>('/classes/promote', {
           fromClassId: body.fromClassId,
           toClassId: body.toClassId,
@@ -320,8 +418,12 @@ export const usePromoteStudents = () =>
         fromClassId: body.fromClassId,
         toClassId: body.toClassId,
         promotedCount: res.promotedCount,
+        retainedCount: res.retainedCount ?? 0,
         academicYearId: body.academicYearId,
         promotedOn: res.promotion?.promotedOn ?? new Date().toISOString(),
+        mode: res.mode as 'manual' | 'auto',
+        promotedStudents: (res.promotedStudents ?? []).map((s) => ({ ...s, status: 'promoted' as const })),
+        retainedStudents: (res.retainedStudents ?? []).map((s) => ({ ...s, status: 'retained' as const })),
       };
     },
     successMsg: 'Students promoted successfully',
@@ -339,8 +441,17 @@ export const useGetPromotions = () =>
           fromClassId: string | null;
           toClassId: string | null;
           promotedCount: number;
+          retainedCount?: number;
           academicYearId: string | null;
           promotedOn: string;
+          mode?: string;
+          students?: Array<{
+            studentId: string;
+            status: string;
+            totalMarks?: number | null;
+            passed?: boolean;
+            student?: { id: string; name: string; rollNo?: string };
+          }>;
         }>>>('/promotions')
         .then(unwrapApi);
       return (res ?? [])
@@ -350,8 +461,30 @@ export const useGetPromotions = () =>
           fromClassId: p.fromClassId as string,
           toClassId: p.toClassId as string,
           promotedCount: p.promotedCount,
+          retainedCount: p.retainedCount ?? 0,
           academicYearId: p.academicYearId ?? '',
           promotedOn: p.promotedOn,
+          mode: p.mode as 'manual' | 'auto' | undefined,
+          promotedStudents: (p.students ?? [])
+            .filter((s) => s.status === 'promoted')
+            .map((s) => ({
+              id: s.student?.id ?? s.studentId,
+              name: s.student?.name ?? 'Unknown',
+              rollNo: s.student?.rollNo,
+              status: 'promoted' as const,
+              totalMarks: s.totalMarks,
+              passed: s.passed,
+            })),
+          retainedStudents: (p.students ?? [])
+            .filter((s) => s.status === 'retained')
+            .map((s) => ({
+              id: s.student?.id ?? s.studentId,
+              name: s.student?.name ?? 'Unknown',
+              rollNo: s.student?.rollNo,
+              status: 'retained' as const,
+              totalMarks: s.totalMarks,
+              passed: s.passed,
+            })),
         }));
     },
   });

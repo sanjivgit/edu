@@ -1,8 +1,10 @@
 import { Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/hooks';
+import { useGetAcademicYears } from '@/features/classes/services/classes.service';
 import { ExamsTable } from '../components/ExamsTable';
 import { useDeleteExam, useGetExams } from '../services/exam.service';
 
@@ -12,7 +14,19 @@ export default function ExamListPage() {
   const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
   const listQuery = useGetExams();
   const deleteMutation = useDeleteExam();
-  const data = listQuery.data ?? [];
+  const { data: academicYears = [] } = useGetAcademicYears();
+  const allData = listQuery.data ?? [];
+
+  const [academicYearFilter, setAcademicYearFilter] = useState('');
+
+  const data = useMemo(() => {
+    return allData.filter((row) => {
+      if (academicYearFilter && row.academicYearId !== academicYearFilter) return false;
+      return true;
+    });
+  }, [allData, academicYearFilter]);
+
+  const selectClass = 'rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
   return (
     <div className="space-y-6">
@@ -25,6 +39,18 @@ export default function ExamListPage() {
           </Button>
         }
       />
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Academic Year</span>
+          <select className={selectClass} value={academicYearFilter} onChange={(e) => setAcademicYearFilter(e.target.value)}>
+            <option value="">All Years</option>
+            {academicYears.map((y) => (
+              <option key={y.id} value={y.id}>{y.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <ExamsTable
         data={data}

@@ -25,6 +25,7 @@ export class AssessmentsService {
           subject: true,
           class_: true,
           author: { select: { id: true, name: true } },
+          academicYear: true,
           _count: { select: { results: true } },
         },
         orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder } : { date: 'desc' },
@@ -63,6 +64,7 @@ export class AssessmentsService {
         subject: true,
         class_: true,
         author: { select: { id: true, name: true } },
+        academicYear: true,
         results: { include: { student: true }, orderBy: { student: { rollNo: 'asc' } } },
       },
     });
@@ -83,6 +85,7 @@ export class AssessmentsService {
         instructions: dto.instructions,
         status: dto.status ?? AssessmentStatus.draft,
         authorId: userId,
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }
@@ -101,6 +104,7 @@ export class AssessmentsService {
         date: dto.date ? new Date(dto.date) : undefined,
         instructions: dto.instructions,
         status: dto.status,
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }

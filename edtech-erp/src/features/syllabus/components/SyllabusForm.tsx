@@ -4,6 +4,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, SelectInput, Textarea } from '@/components/ui/Input';
+import { useGetAcademicYears } from '@/features/classes/services/classes.service';
 import { SyllabusAttachmentsTable } from './SyllabusAttachmentsTable';
 import { createSyllabusSchema, updateSyllabusSchema, type CreateSyllabusPayload, type UpdateSyllabusPayload } from '../validations/syllabus.schema';
 import type { SyllabusAttachment } from '../services/syllabus.service';
@@ -35,6 +36,7 @@ export function SyllabusForm({
       classId: '10',
       section: 'A',
       subject: 'Mathematics',
+      academicYearId: '',
       term: 'term-1',
       description: '',
       attachments: [],
@@ -42,6 +44,8 @@ export function SyllabusForm({
       ...(defaultValues ?? {}),
     } as any,
   });
+
+  const { data: academicYears = [] } = useGetAcademicYears();
 
   const [attachments, setAttachments] = useState<SyllabusAttachment[]>(
     (defaultValues?.attachments as SyllabusAttachment[] | undefined) ?? [{ name: 'Syllabus.pdf', url: 'https://example.com/syllabus.pdf' }]
@@ -78,6 +82,12 @@ export function SyllabusForm({
             options={TERM_OPTIONS}
             value={form.watch('term' as any) as any}
             onChange={(e) => form.setValue('term' as any, e.target.value as any, { shouldValidate: true })}
+          />
+          <SelectInput
+            label="Academic Year"
+            options={academicYears.map((y) => ({ label: y.name, value: y.id }))}
+            value={(form.watch('academicYearId' as any) as string) ?? ''}
+            onChange={(e) => form.setValue('academicYearId' as any, e.target.value || null, { shouldValidate: true })}
           />
           <SelectInput
             label="Status"

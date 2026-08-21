@@ -17,6 +17,8 @@ export interface ExamPaper {
 
 export interface ExamRecord {
   id: string;
+  academicYearId?: string | null;
+  academicYearName?: string;
   name: string;
   term: ExamTerm;
   classId: string;
@@ -51,6 +53,8 @@ interface BackendExamPaper {
 
 interface BackendExam {
   id: string;
+  academicYearId?: string | null;
+  academicYear?: { id: string; name: string } | null;
   name: string;
   term: ExamTerm;
   classId: string;
@@ -83,6 +87,8 @@ function classDisplay(classId: string, className?: string, classMap?: Map<string
 function toExamRecord(e: BackendExam, classMap?: Map<string, string>): ExamRecord {
   return {
     id: e.id,
+    academicYearId: e.academicYearId ?? e.academicYear?.id ?? null,
+    academicYearName: e.academicYear?.name ?? '',
     name: e.name,
     term: e.term,
     classId: classDisplay(e.classId, e.className, classMap),
@@ -100,9 +106,9 @@ export const useGetExams = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendExam[] }>>('/exams', { params: { limit: 500 } })
+        .get<ApiResponse<BackendExam[]>>('/exams', { params: { limit: 500 } })
         .then(unwrapApi);
-      const items = res?.items ?? [];
+      const items = res ?? [];
       const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
       return items.map((i) => toExamRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
@@ -148,6 +154,7 @@ export const useCreateExam = () =>
       section: string;
       papers: ExamPaper[];
       notes?: string;
+      academicYearId?: string | null;
       status?: ExamStatus;
     }
   >({
@@ -170,6 +177,7 @@ export const useCreateExam = () =>
           term: body.term,
           classId,
           section: body.section || undefined,
+          academicYearId: body.academicYearId || undefined,
           status: body.status ?? 'scheduled',
           notes: body.notes ?? undefined,
           papers,
@@ -193,6 +201,7 @@ export const useUpdateExam = () =>
       section: string;
       papers: ExamPaper[];
       notes?: string;
+      academicYearId?: string | null;
       status: ExamStatus;
     }
   >({
@@ -215,6 +224,7 @@ export const useUpdateExam = () =>
           term: body.term,
           classId,
           section: body.section || undefined,
+          academicYearId: body.academicYearId || undefined,
           status: body.status,
           notes: body.notes ?? undefined,
           papers,

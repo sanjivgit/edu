@@ -9,6 +9,7 @@ export const examPaperSchema = yup.object({
 });
 
 export const examCreateSchema = yup.object({
+  academicYearId: yup.string().nullable().optional(),
   name: yup.string().trim().required('Exam name is required'),
   term: yup.string().oneOf(['term-1', 'term-2', 'final']).required('Term is required'),
   classId: yup.string().required('Class is required'),

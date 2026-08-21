@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
+import { useAuth } from '@/hooks';
 import { ExamPapersTable } from '../components/ExamPapersTable';
 import { ExamResultsTable } from '../components/ExamResultsTable';
 import { useGetExamById, useGetExamResults } from '../services/exam.service';
@@ -17,6 +18,7 @@ const TERM_LABEL: Record<string, string> = {
 export default function ExamDetailPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
+  const { isManagement } = useAuth();
   const detailQuery = useGetExamById({ examId });
   const exam = detailQuery.data;
   const resultsQuery = useGetExamResults({ examId });
@@ -50,9 +52,11 @@ export default function ExamDetailPage() {
             <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/exam')}>
               Back
             </Button>
-            <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/exam/${exam.id}/edit`)}>
-              Edit
-            </Button>
+            {isManagement && (
+              <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/exam/${exam.id}/edit`)}>
+                Edit
+              </Button>
+            )}
           </>
         }
       />

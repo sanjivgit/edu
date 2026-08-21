@@ -30,6 +30,7 @@ export class HomeworkService {
           subject: true,
           author: { select: { id: true, name: true } },
           class_: true,
+          academicYear: true,
           _count: { select: { submissions: true } },
         },
         orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder } : { dueDate: 'desc' },
@@ -68,6 +69,7 @@ export class HomeworkService {
         subject: true,
         author: { select: { id: true, name: true } },
         class_: true,
+        academicYear: true,
         submissions: { include: { student: true }, orderBy: { submittedAt: 'desc' } },
       },
     });
@@ -88,6 +90,7 @@ export class HomeworkService {
         status: dto.status ?? HomeworkStatus.assigned,
         attachments: dto.attachments ? (dto.attachments as any) : [],
         authorId: userId,
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }
@@ -106,6 +109,7 @@ export class HomeworkService {
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         status: dto.status,
         attachments: dto.attachments ? (dto.attachments as any) : undefined,
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }

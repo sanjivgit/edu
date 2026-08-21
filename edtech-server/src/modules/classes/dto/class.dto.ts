@@ -82,6 +82,24 @@ export class CreateAcademicYearDto {
   status?: 'active' | 'planned' | 'closed';
 }
 
+export class UpdateAcademicYearDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: 'active' | 'planned' | 'closed';
+}
+
 export class PromoteStudentsDto {
   @IsString()
   fromClassId: string;

@@ -3,6 +3,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input, SelectInput, Textarea } from '@/components/ui/Input';
+import { useGetAcademicYears } from '@/features/classes/services/classes.service';
 import { createHomeworkSchema, updateHomeworkSchema, type CreateHomeworkPayload, type UpdateHomeworkPayload } from '../validations/homework.schema';
 
 type Mode = 'create' | 'edit';
@@ -23,6 +24,7 @@ export function HomeworkForm({
   const form = useForm<CreateHomeworkPayload | UpdateHomeworkPayload>({
     resolver: yupResolver(mode === 'create' ? createHomeworkSchema : updateHomeworkSchema),
     defaultValues: {
+      academicYearId: '',
       title: '',
       description: '',
       classId: '10',
@@ -36,6 +38,7 @@ export function HomeworkForm({
   });
 
   const errors = form.formState.errors as any;
+  const { data: academicYears = [] } = useGetAcademicYears();
 
   return (
     <div className="space-y-4">
@@ -59,6 +62,12 @@ export function HomeworkForm({
             options={['A', 'B', 'C', 'D'].map((s) => ({ label: `Section ${s}`, value: s }))}
             value={form.watch('section' as any) as any}
             onChange={(e) => form.setValue('section' as any, e.target.value as any, { shouldValidate: true })}
+          />
+          <SelectInput
+            label="Academic Year"
+            options={academicYears.map((y) => ({ label: y.name, value: y.id }))}
+            value={(form.watch('academicYearId' as any) as string) ?? ''}
+            onChange={(e) => form.setValue('academicYearId' as any, e.target.value || null, { shouldValidate: true })}
           />
           <Input label="Assigned Date" type="date" {...form.register('assignedDate' as any)} />
           <Input label="Due Date" type="date" {...form.register('dueDate' as any)} />

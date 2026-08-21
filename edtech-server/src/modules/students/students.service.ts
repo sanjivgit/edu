@@ -12,7 +12,7 @@ export class StudentsService {
     private billingService: BillingService,
   ) {}
 
-  async findAll(query: PaginationDto, tenantId?: string) {
+  async findAll(query: PaginationDto, tenantId?: string, userId?: string, role?: string) {
     const page = Number(query.page ?? 1);
     const limit = Number(query.limit ?? 10);
     const skip = (page - 1) * limit;
@@ -30,6 +30,17 @@ export class StudentsService {
         : {}),
     };
 
+    if (role === 'student' && userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { student: { select: { id: true } } } });
+      if (user?.student) {
+        where.id = user.student.id;
+      } else {
+        return { items: [], meta: { page, limit, total: 0, totalPages: 0 } };
+      }
+    } else if (role === 'parent' && userId) {
+      where.parentId = userId;
+    }
+
     const [total, items] = await Promise.all([
       this.prisma.student.count({ where }),
       this.prisma.student.findMany({
@@ -38,6 +49,7 @@ export class StudentsService {
           class_: true,
           section: true,
           parent: { select: { id: true, name: true, email: true } },
+          currentAcademicYear: { select: { id: true, name: true } },
         },
         orderBy: query.sortBy
           ? { [query.sortBy]: query.sortOrder }
@@ -53,6 +65,52 @@ export class StudentsService {
     };
   }
 
+  async findMe(userId: string, role?: string) {
+    if (role === 'student') {
+      const student = await this.prisma.student.findFirst({
+        where: { email: { not: undefined }, parent: undefined },
+        include: {
+          class_: true,
+          section: true,
+          parent: { select: { id: true, name: true, email: true, phone: true } },
+          currentAcademicYear: { select: { id: true, name: true } },
+        },
+      });
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { student: true } });
+      if (user?.student) {
+        const me = await this.prisma.student.findUnique({
+          where: { id: user.student.id },
+          include: {
+            class_: true,
+            section: true,
+            parent: { select: { id: true, name: true, email: true, phone: true } },
+            currentAcademicYear: { select: { id: true, name: true } },
+            attendanceEntries: { include: { session: true }, orderBy: { session: { date: 'desc' } }, take: 30 },
+            payments: { orderBy: { paidDate: 'desc' } },
+            invoices: true,
+          },
+        });
+        if (!me) throw new NotFoundException('Student profile not found');
+        return this.toDto(me);
+      }
+    }
+    throw new NotFoundException('No student profile linked to this account');
+  }
+
+  async findParentChildren(parentId: string) {
+    const children = await this.prisma.student.findMany({
+      where: { parentId, status: 'active' as any },
+      include: {
+        class_: true,
+        section: true,
+        parent: { select: { id: true, name: true, email: true } },
+        currentAcademicYear: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return children.map((s) => this.toDto(s));
+  }
+
   async findOne(id: string) {
     const student = await this.prisma.student.findUnique({
       where: { id },
@@ -60,6 +118,7 @@ export class StudentsService {
         class_: true,
         section: true,
         parent: { select: { id: true, name: true, email: true, phone: true } },
+        currentAcademicYear: { select: { id: true, name: true } },
         attendanceEntries: { include: { session: true }, orderBy: { session: { date: 'desc' } }, take: 30 },
         payments: { orderBy: { paidDate: 'desc' } },
         invoices: true,
@@ -100,9 +159,10 @@ export class StudentsService {
         classId,
         sectionId: dto.sectionId,
         parentId: dto.parentId,
+        currentAcademicYearId: dto.currentAcademicYearId,
         tenantId: effectiveTenantId,
       },
-      include: { class_: true, section: true, parent: true },
+      include: { class_: true, section: true, parent: true, currentAcademicYear: { select: { id: true, name: true } } },
     });
     return this.toDto(student);
   }
@@ -125,8 +185,9 @@ export class StudentsService {
         classId: dto.classId,
         sectionId: dto.sectionId,
         parentId: dto.parentId,
+        currentAcademicYearId: dto.currentAcademicYearId,
       },
-      include: { class_: true, section: true, parent: true },
+      include: { class_: true, section: true, parent: true, currentAcademicYear: { select: { id: true, name: true } } },
     });
     return this.toDto(student);
   }
@@ -166,6 +227,7 @@ export class StudentsService {
         status: StudentStatus.active,
         classId: targetClass.id,
         sectionId: section?.id,
+        currentAcademicYearId: targetClass.academicYearId,
         tenantId,
       },
     });
@@ -199,6 +261,8 @@ export class StudentsService {
       classId: s.classId,
       sectionId: s.sectionId,
       parentId: s.parentId,
+      currentAcademicYearId: s.currentAcademicYearId,
+      currentAcademicYearName: s.currentAcademicYear?.name,
       dob: s.dob,
       gender: s.gender,
       address: s.address,

@@ -73,7 +73,14 @@ export class FeesService {
   }
 
   // ── Payments ─────────────────────────────────────────────────────────────
-  async findAllPayments(query: PaginationDto, status?: string, studentId?: string) {
+  async findAllPayments(
+    query: PaginationDto,
+    status?: string,
+    studentId?: string,
+    classId?: string,
+    section?: string,
+    academicYearId?: string,
+  ) {
     const page = Number(query.page ?? 1);
     const limit = Number(query.limit ?? 10);
     const skip = (page - 1) * limit;
@@ -93,12 +100,20 @@ export class FeesService {
         : {}),
     };
 
+    if (classId || section || academicYearId) {
+      const studentFilter: Prisma.StudentWhereInput = {};
+      if (classId) studentFilter.classId = classId;
+      if (section) studentFilter.section = { name: section };
+      if (academicYearId) studentFilter.currentAcademicYearId = academicYearId;
+      where.student = studentFilter;
+    }
+
     const [total, items] = await Promise.all([
       this.prisma.payment.count({ where }),
       this.prisma.payment.findMany({
         where,
         include: {
-          student: { select: { id: true, name: true, rollNo: true, classId: true, sectionId: true } },
+          student: { select: { id: true, name: true, rollNo: true, classId: true, sectionId: true, section: true, class_: { select: { name: true } } } },
           fee: true,
         },
         orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder } : { paidDate: 'desc' },
@@ -113,7 +128,9 @@ export class FeesService {
         studentId: p.studentId,
         studentName: p.student.name,
         rollNo: p.student.rollNo,
-        className: '',
+        className: p.student.class_?.name ?? '',
+        classId: p.student.classId,
+        section: p.student.section,
         feeType: p.fee?.type ?? 'other',
         feeName: p.fee?.name,
         amount: Number(p.amount),
@@ -127,6 +144,153 @@ export class FeesService {
       })),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  async findStudentPaymentHistory(studentId: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: { class_: { select: { name: true } }, currentAcademicYear: { select: { name: true } }, section: { select: { name: true } } },
+    });
+    if (!student) throw new NotFoundException('Student not found');
+
+    const payments = await this.prisma.payment.findMany({
+      where: { studentId },
+      include: { fee: true },
+      orderBy: { paidDate: 'desc' },
+    });
+
+    const feeStructures = await this.prisma.feeStructure.findMany({
+      where: { classId: student.classId },
+      orderBy: { dueDate: 'desc' },
+    });
+
+    const paidFeeIds = new Set(payments.filter((p) => p.feeId).map((p) => p.feeId));
+
+    const pendingFees = feeStructures
+      .filter((f) => !paidFeeIds.has(f.id))
+      .map((f) => ({
+        id: `pending-${f.id}-${studentId}`,
+        feeId: f.id,
+        feeType: f.type,
+        feeName: f.name,
+        amount: Number(f.amount),
+        dueDate: f.dueDate,
+        status: f.dueDate < new Date() ? 'overdue' : 'pending',
+        paidDate: null,
+        receiptNo: null,
+        paymentMode: null,
+        referenceId: null,
+      }));
+
+    const monthWisePayments = payments.map((p) => {
+      const paidDate = p.paidDate ? new Date(p.paidDate) : null;
+      return {
+        id: p.id,
+        feeId: p.feeId,
+        feeType: p.fee?.type ?? 'other',
+        feeName: p.fee?.name,
+        amount: Number(p.amount),
+        dueDate: p.fee?.dueDate,
+        paidDate: p.paidDate,
+        month: paidDate ? `${paidDate.getFullYear()}-${String(paidDate.getMonth() + 1).padStart(2, '0')}` : null,
+        status: p.status,
+        receiptNo: p.receiptNo,
+        paymentMode: p.mode,
+        referenceId: p.referenceId,
+      };
+    });
+
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalPending = pendingFees.filter((f) => f.status === 'pending').reduce((sum, f) => sum + f.amount, 0);
+    const totalOverdue = pendingFees.filter((f) => f.status === 'overdue').reduce((sum, f) => sum + f.amount, 0);
+
+    return {
+      student: {
+        id: student.id,
+        name: student.name,
+        rollNo: student.rollNo,
+        className: student.class_?.name ?? '',
+        section: student.section?.name,
+        academicYearName: student.currentAcademicYear?.name,
+      },
+      summary: {
+        totalPaid,
+        totalPending,
+        totalOverdue,
+        totalDues: totalPending + totalOverdue,
+      },
+      payments: monthWisePayments,
+      pendingFees,
+    };
+  }
+
+  async findParentChildFees(parentId: string) {
+    const children = await this.prisma.student.findMany({
+      where: { parentId, status: 'active' as any },
+      include: { class_: { select: { name: true } }, currentAcademicYear: { select: { name: true } }, section: { select: { name: true } } },
+    });
+
+    if (children.length === 0) {
+      return { children: [], totalPending: 0, totalOverdue: 0 };
+    }
+
+    const results = await Promise.all(
+      children.map(async (child) => {
+        const payments = await this.prisma.payment.findMany({
+          where: { studentId: child.id },
+          include: { fee: true },
+          orderBy: { paidDate: 'desc' },
+        });
+
+        const feeStructures = await this.prisma.feeStructure.findMany({
+          where: { classId: child.classId },
+        });
+
+        const paidFeeIds = new Set(payments.filter((p) => p.feeId).map((p) => p.feeId));
+
+        const pendingFees = feeStructures
+          .filter((f) => !paidFeeIds.has(f.id))
+          .map((f) => ({
+            id: `pending-${f.id}-${child.id}`,
+            feeId: f.id,
+            feeType: f.type,
+            feeName: f.name,
+            amount: Number(f.amount),
+            dueDate: f.dueDate,
+            status: f.dueDate < new Date() ? 'overdue' : 'pending',
+          }));
+
+        const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const totalPending = pendingFees.filter((f) => f.status === 'pending').reduce((sum, f) => sum + f.amount, 0);
+        const totalOverdue = pendingFees.filter((f) => f.status === 'overdue').reduce((sum, f) => sum + f.amount, 0);
+
+        return {
+          student: {
+            id: child.id,
+            name: child.name,
+            rollNo: child.rollNo,
+            className: child.class_?.name ?? '',
+            section: child.section?.name,
+            academicYearName: child.currentAcademicYear?.name,
+          },
+          summary: { totalPaid, totalPending, totalOverdue, totalDues: totalPending + totalOverdue },
+          recentPayments: payments.slice(0, 5).map((p) => ({
+            id: p.id,
+            amount: Number(p.amount),
+            paidDate: p.paidDate,
+            mode: p.mode,
+            receiptNo: p.receiptNo,
+            feeType: p.fee?.type ?? 'other',
+          })),
+          pendingFees,
+        };
+      }),
+    );
+
+    const totalPending = results.reduce((sum, r) => sum + r.summary.totalPending, 0);
+    const totalOverdue = results.reduce((sum, r) => sum + r.summary.totalOverdue, 0);
+
+    return { children: results, totalPending, totalOverdue };
   }
 
   async findPayment(id: string) {

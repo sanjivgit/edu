@@ -9,6 +9,8 @@ export type AssessmentStatus = 'draft' | 'published' | 'closed';
 
 export interface AssessmentRecord {
   id: string;
+  academicYearId?: string | null;
+  academicYearName?: string;
   title: string;
   type: AssessmentType;
   classId: string;
@@ -35,6 +37,8 @@ const API = '/assessment';
 
 interface BackendAssessment {
   id: string;
+  academicYearId?: string | null;
+  academicYear?: { id: string; name: string } | null;
   title: string;
   type: AssessmentType;
   classId: string;
@@ -61,6 +65,8 @@ function classDisplay(classId: string, className?: string, classMap?: Map<string
 function toAssessmentRecord(a: BackendAssessment, classMap?: Map<string, string>): AssessmentRecord {
   return {
     id: a.id,
+    academicYearId: a.academicYearId ?? a.academicYear?.id ?? null,
+    academicYearName: a.academicYear?.name ?? '',
     title: a.title,
     type: a.type,
     classId: classDisplay(a.classId, a.className, classMap),
@@ -80,9 +86,9 @@ export const useGetAssessments = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendAssessment[] }>>('/assessments', { params: { limit: 500 } })
+        .get<ApiResponse<BackendAssessment[]>>('/assessments', { params: { limit: 500 } })
         .then(unwrapApi);
-      const items = res?.items ?? [];
+      const items = res ?? [];
       const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
       return items.map((i) => toAssessmentRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
@@ -137,6 +143,7 @@ export const useCreateAssessment = () =>
       totalMarks: number;
       date: string;
       instructions?: string;
+      academicYearId?: string | null;
       status?: AssessmentStatus;
     }
   >({
@@ -154,6 +161,7 @@ export const useCreateAssessment = () =>
           totalMarks: Number(body.totalMarks),
           date: body.date,
           instructions: body.instructions || undefined,
+          academicYearId: body.academicYearId || undefined,
           status: body.status ?? 'draft',
         })
         .then(unwrapApi);
@@ -177,6 +185,7 @@ export const useUpdateAssessment = () =>
       totalMarks: number;
       date: string;
       instructions?: string;
+      academicYearId?: string | null;
       status: AssessmentStatus;
     }
   >({
@@ -194,6 +203,7 @@ export const useUpdateAssessment = () =>
           totalMarks: Number(body.totalMarks),
           date: body.date,
           instructions: body.instructions || undefined,
+          academicYearId: body.academicYearId || undefined,
           status: body.status,
         })
         .then(unwrapApi);

@@ -18,6 +18,8 @@ export interface SyllabusRecord {
   classId: string;
   section: string;
   subject: string;
+  academicYearId?: string | null;
+  academicYearName?: string;
   term: SyllabusTerm;
   description?: string;
   attachments: SyllabusAttachment[];
@@ -37,6 +39,8 @@ interface BackendSyllabus {
   subjectId: string | null;
   subject?: { id: string; name: string } | null;
   subjectName?: string;
+  academicYearId?: string | null;
+  academicYear?: { id: string; name: string } | null;
   term: SyllabusTerm;
   description: string | null;
   attachments: SyllabusAttachment[];
@@ -59,6 +63,8 @@ function toSyllabusRecord(s: BackendSyllabus, classMap?: Map<string, string>): S
     classId: classDisplay(s.classId, s.className, classMap),
     section: s.section ?? '',
     subject: s.subject?.name ?? s.subjectName ?? '',
+    academicYearId: s.academicYearId ?? s.academicYear?.id ?? null,
+    academicYearName: s.academicYear?.name ?? '',
     term: s.term,
     description: s.description ?? '',
     attachments: s.attachments ?? [],
@@ -73,9 +79,9 @@ export const useGetSyllabus = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendSyllabus[] }>>('/syllabus', { params: { limit: 500 } })
+        .get<ApiResponse<BackendSyllabus[]>>('/syllabus', { params: { limit: 500 } })
         .then(unwrapApi);
-      const items = res?.items ?? [];
+      const items = res ?? [];
       const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
       return items.map((i) => toSyllabusRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
@@ -109,6 +115,7 @@ export const useCreateSyllabus = () =>
           classId,
           section: body.section || undefined,
           subjectId,
+          academicYearId: (body as any).academicYearId || undefined,
           term: body.term ?? 'final',
           description: body.description || undefined,
           attachments: body.attachments ?? [],
@@ -137,6 +144,7 @@ export const useUpdateSyllabus = () =>
           classId,
           section: body.section || undefined,
           subjectId,
+          academicYearId: (body as any).academicYearId || undefined,
           term: body.term,
           description: body.description || undefined,
           attachments: body.attachments ?? undefined,

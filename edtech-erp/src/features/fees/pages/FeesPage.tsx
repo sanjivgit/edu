@@ -8,7 +8,7 @@ export default function FeesPage() {
     <Routes>
       <Route index element={<FeesListPage />} />
       <Route path="record-payment" element={<FeesRecordPaymentPage />} />
-      <Route path=":feeId" element={<FeeDetailPage />} />
+      <Route path=":id" element={<FeeDetailPage />} />
       <Route path="*" element={<Navigate to="/fees" replace />} />
     </Routes>
   );

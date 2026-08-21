@@ -7,6 +7,7 @@ import {
   CreateSectionDto,
   UpdateSectionDto,
   CreateAcademicYearDto,
+  UpdateAcademicYearDto,
   PromoteStudentsDto,
   AutoPromoteDto,
 } from './dto/class.dto';
@@ -190,6 +191,27 @@ export class ClassesService {
     });
   }
 
+  async updateAcademicYear(id: string, dto: UpdateAcademicYearDto) {
+    const existing = await this.prisma.academicYear.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Academic year not found');
+    return this.prisma.academicYear.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.startDate !== undefined && { startDate: new Date(dto.startDate) }),
+        ...(dto.endDate !== undefined && { endDate: new Date(dto.endDate) }),
+        ...(dto.status !== undefined && { status: dto.status as any }),
+      },
+    });
+  }
+
+  async removeAcademicYear(id: string) {
+    const existing = await this.prisma.academicYear.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Academic year not found');
+    await this.prisma.academicYear.delete({ where: { id } });
+    return { message: 'Academic year deleted successfully' };
+  }
+
   private async resolveTargetSectionId(toClassId: string, section?: string) {
     if (!section) return null;
     const target = await this.prisma.section.findFirst({
@@ -251,6 +273,7 @@ export class ClassesService {
           data: {
             classId: dto.toClassId,
             ...(toSectionId ? { sectionId: toSectionId } : {}),
+            currentAcademicYearId: dto.academicYearId ?? toClass.academicYearId,
           },
         });
       }
@@ -264,6 +287,7 @@ export class ClassesService {
       promotedCount: students.length,
       retainedCount: 0,
       promotion: tx,
+      promotedStudents: students.map((s) => ({ id: s.id, name: s.name, rollNo: s.rollNo })),
     };
   }
 
@@ -399,6 +423,7 @@ export class ClassesService {
           data: {
             classId: dto.toClassId,
             ...(toSectionId ? { sectionId: toSectionId } : {}),
+            currentAcademicYearId: dto.academicYearId ?? toClass.academicYearId,
           },
         });
       }
@@ -414,6 +439,8 @@ export class ClassesService {
       retainedCount: willRetain.length,
       retainedStudentIds: willRetain.map((e) => e.studentId),
       promotion: tx,
+      promotedStudents: willPromote.map((e) => ({ id: e.studentId, name: e.name, rollNo: e.rollNo })),
+      retainedStudents: willRetain.map((e) => ({ id: e.studentId, name: e.name, rollNo: e.rollNo })),
     };
   }
 

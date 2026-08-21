@@ -8,6 +8,8 @@ export type HomeworkStatus = 'draft' | 'assigned' | 'closed';
 
 export interface HomeworkRecord {
   id: string;
+  academicYearId?: string | null;
+  academicYearName?: string;
   title: string;
   description: string;
   classId: string;
@@ -34,6 +36,8 @@ const API = '/homework';
 
 interface BackendHomework {
   id: string;
+  academicYearId?: string | null;
+  academicYear?: { id: string; name: string } | null;
   title: string;
   description: string;
   classId: string;
@@ -60,6 +64,8 @@ function classDisplay(classId: string, className?: string, classMap?: Map<string
 function toHomeworkRecord(h: BackendHomework, classMap?: Map<string, string>): HomeworkRecord {
   return {
     id: h.id,
+    academicYearId: h.academicYearId ?? h.academicYear?.id ?? null,
+    academicYearName: h.academicYear?.name ?? '',
     title: h.title,
     description: h.description ?? '',
     classId: classDisplay(h.classId, h.className, classMap),
@@ -79,9 +85,9 @@ export const useGetHomework = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendHomework[] }>>('/homework', { params: { limit: 500 } })
+        .get<ApiResponse<BackendHomework[]>>('/homework', { params: { limit: 500 } })
         .then(unwrapApi);
-      const items = res?.items ?? [];
+      const items = res ?? [];
       const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
       return items.map((i) => toHomeworkRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
@@ -141,6 +147,7 @@ export const useCreateHomework = () =>
       subject: string;
       assignedDate: string;
       dueDate: string;
+      academicYearId?: string | null;
       status?: HomeworkStatus;
       attachments?: string[];
     }
@@ -158,6 +165,7 @@ export const useCreateHomework = () =>
           subjectId,
           assignedDate: body.assignedDate,
           dueDate: body.dueDate,
+          academicYearId: body.academicYearId || undefined,
           status: body.status ?? 'assigned',
           attachments: body.attachments ?? [],
         })
@@ -181,6 +189,7 @@ export const useUpdateHomework = () =>
       subject: string;
       assignedDate: string;
       dueDate: string;
+      academicYearId?: string | null;
       status: HomeworkStatus;
       attachments?: string[];
     }
@@ -198,6 +207,7 @@ export const useUpdateHomework = () =>
           subjectId,
           assignedDate: body.assignedDate,
           dueDate: body.dueDate,
+          academicYearId: body.academicYearId || undefined,
           status: body.status,
           attachments: body.attachments ?? [],
         })

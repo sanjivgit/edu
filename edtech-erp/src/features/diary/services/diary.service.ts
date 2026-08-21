@@ -70,9 +70,9 @@ export const useGetDiaryEntries = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendDiaryEntry[] }>>(API, { params: { limit: 500 } })
+        .get<ApiResponse<BackendDiaryEntry[]>>(API, { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? [])
+      return (res ?? [])
         .map(toDiaryEntry)
         .sort((a, b) => b.date.localeCompare(a.date));
     },

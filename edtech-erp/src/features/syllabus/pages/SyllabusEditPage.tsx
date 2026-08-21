@@ -42,6 +42,7 @@ export default function SyllabusEditPage() {
         classId: values.classId,
         section: values.section,
         subject: values.subject,
+        academicYearId: values.academicYearId ?? item.academicYearId ?? null,
         term: values.term,
         description: values.description ?? '',
         attachments,

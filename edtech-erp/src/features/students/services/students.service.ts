@@ -22,6 +22,8 @@ export interface StudentRecord {
   admissionDate?: string;
   status: StudentStatus;
   parentName?: string;
+  currentAcademicYearId?: string;
+  currentAcademicYearName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +42,8 @@ interface BackendStudent {
   sectionId: string | null;
   sectionName?: string;
   parent?: { id: string; name: string; email?: string; phone?: string } | null;
+  currentAcademicYearId?: string | null;
+  currentAcademicYear?: { id: string; name: string } | null;
   dob?: string;
   gender?: StudentGender;
   address?: string;
@@ -71,6 +75,8 @@ function toStudentRecord(s: BackendStudent): StudentRecord {
     admissionDate: s.admissionDate,
     status: s.status,
     parentName: s.parent?.name,
+    currentAcademicYearId: s.currentAcademicYearId ?? undefined,
+    currentAcademicYearName: s.currentAcademicYear?.name,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
   };
@@ -81,9 +87,9 @@ export const useGetStudents = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendStudent[] }>>('/students', { params: { limit: 500 } })
+        .get<ApiResponse<BackendStudent[]>>('/students', { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? []).map(toStudentRecord).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return (res ?? []).map(toStudentRecord).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
   });
 
@@ -113,6 +119,7 @@ export const useCreateStudent = () =>
       status?: StudentStatus;
       classId: string;
       section?: string;
+      currentAcademicYearId?: string;
     }
   >({
     mutationFn: async (body) => {
@@ -132,6 +139,7 @@ export const useCreateStudent = () =>
           status: body.status ?? 'active',
           classId,
           sectionId,
+          currentAcademicYearId: body.currentAcademicYearId || undefined,
         })
         .then(unwrapApi);
       return toStudentRecord(created);
@@ -157,6 +165,7 @@ export const useUpdateStudent = () =>
       status: StudentStatus;
       classId: string;
       section?: string;
+      currentAcademicYearId?: string;
     }
   >({
     mutationFn: async (body) => {
@@ -176,6 +185,7 @@ export const useUpdateStudent = () =>
           status: body.status,
           classId,
           sectionId,
+          currentAcademicYearId: body.currentAcademicYearId || undefined,
         })
         .then(unwrapApi);
       return toStudentRecord(updated);
@@ -194,4 +204,24 @@ export const useDeleteStudent = () =>
     successMsg: 'Student deleted successfully',
     errorMsg: 'Failed to delete student',
     invalidateQueryKeys: [[API, 'list']],
+  });
+
+export const useGetMyStudentProfile = () =>
+  useQuery({
+    queryKey: [API, 'me'],
+    queryFn: async () => {
+      const s = await apiClient.get<ApiResponse<BackendStudent>>('/students/me').then(unwrapApi);
+      return s ? toStudentRecord(s) : null;
+    },
+  });
+
+export const useGetParentChildren = () =>
+  useQuery({
+    queryKey: [API, 'parent-children'],
+    queryFn: async () => {
+      const res = await apiClient
+        .get<ApiResponse<BackendStudent[]>>('/students/parent/children')
+        .then(unwrapApi);
+      return (res ?? []).map(toStudentRecord);
+    },
   });

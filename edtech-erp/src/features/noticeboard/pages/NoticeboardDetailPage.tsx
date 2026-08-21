@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
+import { useAuth } from '@/hooks';
 import { formatNoticeAudience, useGetNoticeById } from '../services/noticeboard.service';
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -16,6 +17,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 export default function NoticeboardDetailPage() {
   const navigate = useNavigate();
   const { noticeId } = useParams();
+  const { isManagement } = useAuth();
   const detailQuery = useGetNoticeById({ noticeId });
   const notice = detailQuery.data;
 
@@ -48,9 +50,11 @@ export default function NoticeboardDetailPage() {
             <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/noticeboard')}>
               Back
             </Button>
-            <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/noticeboard/${notice.id}/edit`)}>
-              Edit
-            </Button>
+            {isManagement && (
+              <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/noticeboard/${notice.id}/edit`)}>
+                Edit
+              </Button>
+            )}
           </>
         }
       />

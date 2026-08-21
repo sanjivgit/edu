@@ -1,6 +1,7 @@
 import * as yup from 'yup';
 
 export const admissionCreateSchema = yup.object({
+  academicYearId: yup.string().nullable().optional(),
   firstName: yup.string().trim().required('First name is required'),
   lastName: yup.string().trim().required('Last name is required'),
   dateOfBirth: yup.string().required('Date of birth is required'),

@@ -62,9 +62,9 @@ export const useGetHolidays = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendHoliday[] }>>(API, { params: { limit: 500 } })
+        .get<ApiResponse<BackendHoliday[]>>(API, { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? [])
+      return (res ?? [])
         .map(toHolidayRecord)
         .sort((a, b) => b.startDate.localeCompare(a.startDate));
     },

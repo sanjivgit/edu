@@ -80,9 +80,9 @@ export const useGetNotices = () =>
     queryKey: [API, 'list'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendNotice[] }>>(API, { params: { limit: 500 } })
+        .get<ApiResponse<BackendNotice[]>>(API, { params: { limit: 500 } })
         .then(unwrapApi);
-      const items = res?.items ?? [];
+      const items = res ?? [];
       const classIds = items
         .map((i) => i.audience?.classId ?? i.classId)
         .filter((id): id is string => !!id);

@@ -280,6 +280,11 @@ enum OtpStatus {
   expired
 }
 
+enum ScoreCardStatus {
+  draft
+  published
+}
+
 enum SubjectCategory {
   core
   language
@@ -480,8 +485,15 @@ model AcademicYear {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
-  classes   Class[]
+  classes    Class[]
   promotions Promotion[] @relation("PromotionYear")
+  students   Student[]    @relation("StudentAcademicYear")
+  admissions Admission[]
+  homework   Homework[]
+  assessments Assessment[]
+  exams      Exam[]
+  syllabus   Syllabus[]
+  scoreCards ScoreCard[]
 
   @@index([tenantId])
   @@map("academic_years")
@@ -515,6 +527,7 @@ model Class {
   assessments     Assessment[]
   exams           Exam[]
   syllabus        Syllabus[]
+  scoreCards      ScoreCard[]
   notices         Notice[]
   feeStructures   FeeStructure[]
   timetables      Timetable[]
@@ -665,6 +678,8 @@ model Student {
   parent        User?        @relation("StudentParent", fields: [parentId], references: [id], onDelete: SetNull)
   userId        String?      @unique
   user          User?        @relation("StudentUser", fields: [userId], references: [id], onDelete: SetNull)
+  currentAcademicYearId String?
+  currentAcademicYear   AcademicYear? @relation("StudentAcademicYear", fields: [currentAcademicYearId], references: [id], onDelete: SetNull)
   tenantId      String
   tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt     DateTime     @default(now())
@@ -678,6 +693,7 @@ model Student {
   assessmentResults AssessmentResult[]
   examResults   ExamResult[]
   promotions    PromotionStudent[]
+  scoreCards    ScoreCard[]
 
   @@index([classId, sectionId])
   @@index([tenantId])
@@ -699,6 +715,8 @@ model Admission {
   studentAadhaar  String?
   classApplyingFor String
   sectionPreference String?
+  academicYearId  String?
+  academicYear    AcademicYear?   @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   previousSchool  String?
   previousGrade   String?
   tcNumber        String?
@@ -780,6 +798,8 @@ model Homework {
   section     String?
   subjectId   String?
   subject     Subject?       @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  academicYearId String?
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   assignedDate DateTime
   dueDate     DateTime
   status      HomeworkStatus @default(assigned)
@@ -823,6 +843,8 @@ model Assessment {
   section     String?
   subjectId   String?
   subject     Subject?         @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  academicYearId String?
+  academicYear AcademicYear?   @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   totalMarks  Int
   date        DateTime
   instructions String?
@@ -864,6 +886,8 @@ model Exam {
   classId   String
   class_    Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
   section   String?
+  academicYearId String?
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   status    ExamStatus @default(draft)
   notes     String?
   passPercentage Int   @default(35)
@@ -874,6 +898,7 @@ model Exam {
 
   papers    ExamPaper[]
   results   ExamResult[]
+  scoreCards ScoreCard[]
   promotions Promotion[] @relation("PromotionExam")
   tenantId   String?
 
@@ -894,6 +919,8 @@ model ExamPaper {
   totalMarks     Int
   tenantId       String?
 
+  scoreCardItems ScoreCardItem[]
+
   @@index([tenantId])
   @@map("exam_papers")
 }
@@ -913,6 +940,51 @@ model ExamResult {
   @@map("exam_results")
 }
 
+// ─── Score Cards ─────────────────────────────────────────────────────────────
+
+model ScoreCard {
+  id            String          @id @default(cuid())
+  examId        String
+  exam          Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  academicYearId String?
+  academicYear  AcademicYear?   @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
+  classId       String
+  class_        Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  status        ScoreCardStatus @default(draft)
+  totalMarks    Float           @default(0)
+  obtainedMarks Float           @default(0)
+  percentage    Float           @default(0)
+  grade         String?
+  publishedAt   DateTime?
+  tenantId      String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  items         ScoreCardItem[]
+
+  @@unique([examId, studentId])
+  @@index([tenantId])
+  @@map("score_cards")
+}
+
+model ScoreCardItem {
+  id            String   @id @default(cuid())
+  scoreCardId   String
+  scoreCard     ScoreCard @relation(fields: [scoreCardId], references: [id], onDelete: Cascade)
+  examPaperId   String
+  examPaper     ExamPaper @relation(fields: [examPaperId], references: [id], onDelete: Cascade)
+  subjectName   String
+  totalMarks    Int
+  obtainedMarks Float    @default(0)
+  grade         String?
+  remarks       String?
+  tenantId      String?
+
+  @@map("score_card_items")
+}
+
 // ─── Syllabus ─────────────────────────────────────────────────────────────────
 
 model Syllabus {
@@ -923,6 +995,8 @@ model Syllabus {
   section     String?
   subjectId   String?
   subject     Subject?       @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  academicYearId String?
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id], onDelete: SetNull)
   term        ExamTerm       @default(final)
   description String?
   attachments Json           @default("[]")

@@ -20,6 +20,7 @@ export default function HomeworkCreatePage() {
         subject: values.subject,
         assignedDate: values.assignedDate,
         dueDate: values.dueDate,
+        academicYearId: values.academicYearId ?? null,
         attachments: values.attachments ?? [],
         status: 'assigned',
       } as any,

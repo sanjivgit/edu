@@ -75,8 +75,8 @@ export const useGetInvoices = () =>
   useQuery({
     queryKey: [API, 'list'],
     queryFn: async () => {
-      const res = await apiClient.get<ApiResponse<{ items: BackendInvoice[] }>>('/invoices', { params: { limit: 500 } }).then(unwrapApi);
-      const items = res?.items ?? [];
+      const res = await apiClient.get<ApiResponse<BackendInvoice[]>>('/invoices', { params: { limit: 500 } }).then(unwrapApi);
+      const items = res ?? [];
       const classMap = await resolveClassDisplayMap(items.map((i) => i.classId));
       return items.map((i) => toInvoiceRecord(i, classMap)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },

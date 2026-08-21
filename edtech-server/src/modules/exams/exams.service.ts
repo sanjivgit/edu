@@ -25,6 +25,7 @@ export class ExamsService {
           class_: true,
           author: { select: { id: true, name: true } },
           papers: true,
+          academicYear: true,
           _count: { select: { results: true } },
         },
         orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder } : { createdAt: 'desc' },
@@ -60,6 +61,7 @@ export class ExamsService {
         class_: true,
         author: { select: { id: true, name: true } },
         papers: true,
+        academicYear: true,
         results: { include: { student: true }, orderBy: { student: { rollNo: 'asc' } } },
       },
     });
@@ -86,6 +88,7 @@ export class ExamsService {
         notes: dto.notes,
         passPercentage: dto.passPercentage,
         authorId: userId,
+        academicYearId: dto.academicYearId ?? undefined,
         papers: {
           create: dto.papers.map((p) => ({
             subjectId: p.subjectId,
@@ -114,6 +117,7 @@ export class ExamsService {
         status: dto.status,
         notes: dto.notes,
         passPercentage: dto.passPercentage,
+        academicYearId: dto.academicYearId ?? undefined,
         papers: {
           create: dto.papers.map((p) => ({
             subjectId: p.subjectId,

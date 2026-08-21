@@ -1,6 +1,7 @@
 import * as yup from 'yup';
 
 export const createHomeworkSchema = yup.object({
+  academicYearId: yup.string().nullable().optional(),
   title: yup.string().trim().required('Title is required'),
   description: yup.string().trim().required('Description is required'),
   classId: yup.string().required('Class is required'),

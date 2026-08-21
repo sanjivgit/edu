@@ -50,6 +50,8 @@ export function useAuth() {
     isTeacher: user?.role === 'teacher',
     isStudent: user?.role === 'student',
     isParent: user?.role === 'parent',
+    isManagement: user?.role === 'superadmin' || user?.role === 'admin',
+    isTeachingStaff: user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'superadmin',
   };
 }
 

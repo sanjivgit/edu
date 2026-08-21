@@ -7,6 +7,8 @@ export type AdmissionStatus = 'pending' | 'approved' | 'rejected';
 
 export interface AdmissionRecord {
   id: string;
+  academicYearId?: string | null;
+  academicYearName?: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;
@@ -50,6 +52,7 @@ const API = '/admissions';
 
 type BackendAdmission = Omit<AdmissionRecord, 'annualIncome'> & {
   annualIncome?: string | number | null;
+  academicYear?: { id: string; name: string } | null;
   [key: string]: unknown;
 };
 
@@ -60,6 +63,8 @@ function toAdmissionRecord(a: BackendAdmission): AdmissionRecord {
     annualIncome: annualIncome == null || annualIncome === '' ? undefined : Number(annualIncome),
     gender: a.gender ?? 'male',
     country: a.country ?? 'India',
+    academicYearId: a.academicYearId ?? a.academicYear?.id ?? null,
+    academicYearName: a.academicYear?.name ?? '',
   };
 }
 

@@ -21,6 +21,7 @@ export default function AssessmentCreatePage() {
         totalMarks: values.totalMarks,
         date: values.date,
         instructions: values.instructions ?? '',
+        academicYearId: values.academicYearId ?? null,
         status: 'published',
       },
       { onSuccess: (created) => navigate(`/assessment/${created.id}`) }

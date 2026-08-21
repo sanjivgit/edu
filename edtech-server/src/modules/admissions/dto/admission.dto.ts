@@ -146,6 +146,10 @@ export class CreateAdmissionDto {
   @IsOptional()
   @IsString()
   tenantCode?: string;
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
 }
 
 export class UpdateAdmissionDto extends CreateAdmissionDto {}

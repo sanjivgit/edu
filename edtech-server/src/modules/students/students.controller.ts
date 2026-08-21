@@ -23,9 +23,27 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class StudentsController {
   constructor(private studentsService: StudentsService) {}
 
+  @Get('students/me')
+  findMe(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') role?: string,
+  ) {
+    return this.studentsService.findMe(userId, role);
+  }
+
+  @Get('students/parent/children')
+  findParentChildren(@CurrentUser('id') parentId: string) {
+    return this.studentsService.findParentChildren(parentId);
+  }
+
   @Get('students')
-  findAll(@Query() query: PaginationDto, @CurrentUser('tenantId') tenantId?: string) {
-    return this.studentsService.findAll(query, tenantId);
+  findAll(
+    @Query() query: PaginationDto,
+    @CurrentUser('tenantId') tenantId?: string,
+    @CurrentUser('id') userId?: string,
+    @CurrentUser('role') role?: string,
+  ) {
+    return this.studentsService.findAll(query, tenantId, userId, role);
   }
 
   @Get('students/:id')

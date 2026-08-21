@@ -62,6 +62,10 @@ export class CreateStudentDto {
   @IsArray()
   @IsString({ each: true })
   subjectIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  currentAcademicYearId?: string;
 }
 
 export class UpdateStudentDto extends CreateStudentDto {}

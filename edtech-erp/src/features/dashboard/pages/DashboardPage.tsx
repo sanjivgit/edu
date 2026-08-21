@@ -148,7 +148,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isManagement, isStudent, isParent } = useAuth();
   const statsQuery = useDashboardStats(user?.role);
   const enrollmentQuery = useEnrollmentTrend();
   const attendanceQuery = useAttendanceSummary();
@@ -199,16 +199,32 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title={`${greeting}, ${user?.name?.split(' ')[0] ?? 'there'} 👋`}
-        description="Here's what's happening at your institution today."
+        description={
+          isStudent ? "Here's a summary of your academic progress."
+          : isParent ? "Here's what's happening with your children today."
+          : "Here's what's happening at your institution today."
+        }
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" leftIcon={<Calendar className="h-4 w-4" />}>
-              April 2025
+          isManagement ? (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" leftIcon={<Calendar className="h-4 w-4" />}>
+                April 2025
+              </Button>
+              <Button size="sm" leftIcon={<TrendingUp className="h-4 w-4" />}>
+                View Reports
+              </Button>
+            </div>
+          ) : isStudent ? (
+            <Button variant="outline" size="sm" leftIcon={<BookOpen className="h-4 w-4" />}
+              onClick={() => window.location.href = '/student/attendance'}>
+              My Attendance
             </Button>
-            <Button size="sm" leftIcon={<TrendingUp className="h-4 w-4" />}>
-              View Reports
+          ) : isParent ? (
+            <Button variant="outline" size="sm" leftIcon={<Users className="h-4 w-4" />}
+              onClick={() => window.location.href = '/parent-portal'}>
+              View Children
             </Button>
-          </div>
+          ) : null
         }
       />
 
@@ -219,7 +235,86 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Charts Row 1 */}
+      {/* Student-specific quick actions */}
+      {isStudent && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/attendance'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">My Attendance</p>
+                <p className="text-xs text-muted-foreground">View your attendance record</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/fees'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">My Fees</p>
+                <p className="text-xs text-muted-foreground">Check fee status & pay</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/exams'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <BookOpen className="h-5 w-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">My Exams</p>
+                <p className="text-xs text-muted-foreground">View upcoming & past exams</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Parent-specific quick actions */}
+      {isParent && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/parent-portal'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">My Children</p>
+                <p className="text-xs text-muted-foreground">View progress & details</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/parent-portal/fees'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Fee Payments</p>
+                <p className="text-xs text-muted-foreground">Pay fees online</p>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/notices'}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Noticeboard</p>
+                <p className="text-xs text-muted-foreground">View school notices</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Charts Row 1 — admin/teacher only */}
+      {isManagement && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Enrollment Trend */}
         <Card className="lg:col-span-2">
@@ -318,8 +413,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
-      {/* Charts Row 2 */}
+      {/* Charts Row 2 — admin/teacher only */}
+      {isManagement && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Fee Collection */}
         <Card>
@@ -373,6 +470,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Activity + Events */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">

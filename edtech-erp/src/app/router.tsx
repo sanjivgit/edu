@@ -31,6 +31,7 @@ const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage'));
 const GalleryPage = lazy(() => import('@/features/gallery/pages/GalleryPage'));
 const SyllabusPage = lazy(() => import('@/features/syllabus/pages/SyllabusPage'));
 const ClassesPage = lazy(() => import('@/features/classes/pages/ClassesPage'));
+const AcademicYearsPage = lazy(() => import('@/features/academic-years/pages/AcademicYearsPage'));
 const TransportPage = lazy(() => import('@/features/transport/pages/TransportPage'));
 const LiveLecturePage = lazy(() => import('@/features/live-lecture/pages/LiveLecturePage'));
 const RecordedLecturePage = lazy(() => import('@/features/recorded-lecture/pages/RecordedLecturePage'));
@@ -40,6 +41,8 @@ const RolesPage = lazy(() => import('@/features/roles/pages/RolesPage'));
 const ProductPage = lazy(() => import('@/features/product/pages/ProductPage'));
 const TeachersPage = lazy(() => import('@/features/teachers/pages/TeachersPage'));
 const StudentsPage = lazy(() => import('@/features/students/pages/StudentsPage'));
+const ScoreCardPage = lazy(() => import('@/features/score-card/pages/ScoreCardPage'));
+const ParentPortalPage = lazy(() => import('@/features/parent-portal/pages/ParentPortalPage'));
 
 const AdminOverviewPage = lazy(() => import('@/features/admin/pages/AdminOverviewPage'));
 const AdminTenantsPage = lazy(() => import('@/features/admin/pages/AdminTenantsPage'));
@@ -122,7 +125,8 @@ const router = createBrowserRouter([
       { path: 'assessments/*', element: <ProtectedModule moduleId="assessment"><AssessmentPage /></ProtectedModule> },
       { path: 'noticeboard/*', element: <ProtectedModule moduleId="noticeboard"><NoticeboardPage /></ProtectedModule> },
       { path: 'reports/*', element: <ProtectedModule moduleId="reports"><ReportsPage /></ProtectedModule> },
-      { path: 'exams/*', element: <ProtectedModule moduleId="exam"><ExamPage /></ProtectedModule> },
+      { path: 'exam/*', element: <ProtectedModule moduleId="exam"><ExamPage /></ProtectedModule> },
+      { path: 'score-cards/*', element: <ProtectedModule moduleId="score-cards"><ScoreCardPage /></ProtectedModule> },
       { path: 'notifications', element: <ProtectedModule moduleId="notifications"><NotificationsPage /></ProtectedModule> },
       { path: 'diary/*', element: <ProtectedModule moduleId="diary"><DiaryPage /></ProtectedModule> },
       { path: 'holidays/*', element: <ProtectedModule moduleId="holidays"><HolidaysPage /></ProtectedModule> },
@@ -132,6 +136,7 @@ const router = createBrowserRouter([
       { path: 'teachers/*', element: <ProtectedModule moduleId="teachers"><TeachersPage /></ProtectedModule> },
       { path: 'students/*', element: <ProtectedModule moduleId="students"><StudentsPage /></ProtectedModule> },
       { path: 'classes/*', element: <ProtectedModule moduleId="classes"><ClassesPage /></ProtectedModule> },
+      { path: 'academic-years/*', element: <ProtectedModule moduleId="academic-years"><AcademicYearsPage /></ProtectedModule> },
       { path: 'transport/*', element: <ProtectedModule moduleId="transport"><TransportPage /></ProtectedModule> },
       { path: 'live-classes/*', element: <ProtectedModule moduleId="live-lecture"><LiveLecturePage /></ProtectedModule> },
       { path: 'recorded-lectures/*', element: <ProtectedModule moduleId="recorded-lecture"><RecordedLecturePage /></ProtectedModule> },
@@ -139,6 +144,7 @@ const router = createBrowserRouter([
       { path: 'audit-logs', element: <ProtectedModule moduleId="audit-logs"><AuditLogsPage /></ProtectedModule> },
       { path: 'roles/*', element: <ProtectedModule moduleId="roles"><RolesPage /></ProtectedModule> },
       { path: 'products/*', element: <ProtectedModule moduleId="product"><ProductPage /></ProtectedModule> },
+      { path: 'parent-portal/*', element: <ProtectedModule moduleId="parent-portal"><ParentPortalPage /></ProtectedModule> },
       { path: 'billing', element: <ProtectedModule moduleId="billing"><AdminOverviewPage /></ProtectedModule> },
       { path: 'billing/schools', element: <ProtectedModule moduleId="billing-tenants"><AdminTenantsPage /></ProtectedModule> },
       { path: 'billing/schools/:id', element: <ProtectedModule moduleId="billing-tenants"><AdminTenantDetailPage /></ProtectedModule> },

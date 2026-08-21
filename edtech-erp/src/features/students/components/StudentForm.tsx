@@ -3,6 +3,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { Card } from '@/components/ui/Card';
 import { Input, SelectInput, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { useGetAcademicYears } from '@/features/classes/services/classes.service';
 import {
   createStudentSchema,
   updateStudentSchema,
@@ -35,11 +36,14 @@ export function StudentForm({
       status: 'active',
       classId: '10',
       section: 'A',
+      currentAcademicYearId: '',
       ...(defaultValues ?? {}),
     } as any,
   });
 
   const errors = form.formState.errors as any;
+  const academicYearsQuery = useGetAcademicYears();
+  const academicYears = academicYearsQuery.data ?? [];
 
   return (
     <Card className="p-5">
@@ -82,6 +86,15 @@ export function StudentForm({
           onChange={(e) => form.setValue('status' as any, e.target.value as any, { shouldValidate: true })}
         />
         <Input label="Admission Date" type="date" {...form.register('admissionDate' as any)} />
+        <SelectInput
+          label="Academic Year"
+          options={[
+            { label: 'Select Year', value: '' },
+            ...academicYears.map((y) => ({ label: y.name, value: y.id })),
+          ]}
+          value={form.watch('currentAcademicYearId' as any) as any}
+          onChange={(e) => form.setValue('currentAcademicYearId' as any, e.target.value || undefined, { shouldValidate: true })}
+        />
       </div>
 
       <div className="mt-4">

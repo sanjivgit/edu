@@ -63,6 +63,10 @@ export class CreateExamDto {
   @ValidateNested({ each: true })
   @Type(() => ExamPaperDto)
   papers: ExamPaperDto[];
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
 }
 
 export class UpdateExamDto extends CreateExamDto {}

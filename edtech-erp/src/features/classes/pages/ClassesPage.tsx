@@ -16,6 +16,8 @@ import { SectionsTable } from '../components/SectionsTable';
 import { useClassesUi } from '../hooks/useClassesUi';
 import {
   useCreateAcademicYear,
+  useUpdateAcademicYear,
+  useDeleteAcademicYear,
   useAddClass,
   useAddSection,
   useDeleteClass,
@@ -47,12 +49,16 @@ export default function ClassesPage() {
   const editSection = useEditSection();
   const deleteSection = useDeleteSection();
   const createAcademicYear = useCreateAcademicYear();
+  const updateAcademicYear = useUpdateAcademicYear();
+  const deleteAcademicYear = useDeleteAcademicYear();
   const promoteStudents = usePromoteStudents();
   const [academicYearForm, setAcademicYearForm] = useState({
     name: '',
     startDate: '',
     endDate: '',
   });
+  const [editingAcademicYear, setEditingAcademicYear] = useState<import('../services/classes.service').AcademicYearItem | null>(null);
+  const [deletingAcademicYear, setDeletingAcademicYear] = useState<import('../services/classes.service').AcademicYearItem | null>(null);
 
   const classes = classesQuery.data ?? [];
   const teacherNames = (teachersQuery.data ?? []).filter((t) => t.status === 'active').map((t) => t.fullName);
@@ -166,26 +172,76 @@ export default function ClassesPage() {
           {canManage ? (
             <Card className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Input label="Year Name" value={academicYearForm.name} onChange={(e) => setAcademicYearForm((p) => ({ ...p, name: e.target.value }))} placeholder="2026-2027" />
-                <Input label="Start Date" type="date" value={academicYearForm.startDate} onChange={(e) => setAcademicYearForm((p) => ({ ...p, startDate: e.target.value }))} />
-                <Input label="End Date" type="date" value={academicYearForm.endDate} onChange={(e) => setAcademicYearForm((p) => ({ ...p, endDate: e.target.value }))} />
-                <div className="flex items-end">
-                  <Button
-                    className="w-full"
-                    isLoading={createAcademicYear.isPending}
-                    onClick={() =>
-                      createAcademicYear.mutate(academicYearForm, {
-                        onSuccess: () => setAcademicYearForm({ name: '', startDate: '', endDate: '' }),
-                      })
-                    }
-                  >
-                    Create Year
-                  </Button>
+                <Input
+                  label="Year Name"
+                  value={editingAcademicYear ? '' : academicYearForm.name}
+                  onChange={(e) => setAcademicYearForm((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="2026-2027"
+                  disabled={!!editingAcademicYear}
+                />
+                <Input
+                  label="Start Date"
+                  type="date"
+                  value={editingAcademicYear ? '' : academicYearForm.startDate}
+                  onChange={(e) => setAcademicYearForm((p) => ({ ...p, startDate: e.target.value }))}
+                  disabled={!!editingAcademicYear}
+                />
+                <Input
+                  label="End Date"
+                  type="date"
+                  value={editingAcademicYear ? '' : academicYearForm.endDate}
+                  onChange={(e) => setAcademicYearForm((p) => ({ ...p, endDate: e.target.value }))}
+                  disabled={!!editingAcademicYear}
+                />
+                <div className="flex items-end gap-2">
+                  {editingAcademicYear ? (
+                    <>
+                      <Button
+                        className="flex-1"
+                        isLoading={updateAcademicYear.isPending}
+                        onClick={() =>
+                          updateAcademicYear.mutate(
+                            { id: editingAcademicYear.id, payload: academicYearForm },
+                            { onSuccess: () => { setEditingAcademicYear(null); setAcademicYearForm({ name: '', startDate: '', endDate: '' }); } }
+                          )
+                        }
+                      >
+                        Update Year
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setEditingAcademicYear(null); setAcademicYearForm({ name: '', startDate: '', endDate: '' }); }}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      isLoading={createAcademicYear.isPending}
+                      onClick={() =>
+                        createAcademicYear.mutate(academicYearForm, {
+                          onSuccess: () => setAcademicYearForm({ name: '', startDate: '', endDate: '' }),
+                        })
+                      }
+                    >
+                      Create Year
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
           ) : null}
-          <AcademicYearsTable data={academicYears} isLoading={academicYearsQuery.isLoading} />
+          <AcademicYearsTable
+            data={academicYears}
+            isLoading={academicYearsQuery.isLoading}
+            canManage={canManage}
+            onEdit={canManage ? (row) => {
+              setEditingAcademicYear(row);
+              setAcademicYearForm({ name: row.name, startDate: row.startDate?.slice(0, 10) ?? '', endDate: row.endDate?.slice(0, 10) ?? '' });
+            } : undefined}
+            onDelete={canManage ? (row) => setDeletingAcademicYear(row) : undefined}
+          />
         </div>
       ) : (
         <PromotionPanel
@@ -247,6 +303,19 @@ export default function ClassesPage() {
           confirmLabel="Delete"
           variant="danger"
           isLoading={deleteSection.isPending}
+        />
+      )}
+
+      {canManage && deletingAcademicYear && (
+        <ConfirmModal
+          isOpen={!!deletingAcademicYear}
+          onClose={() => setDeletingAcademicYear(null)}
+          onConfirm={() => deleteAcademicYear.mutate(deletingAcademicYear.id, { onSuccess: () => setDeletingAcademicYear(null) })}
+          title={`Delete ${deletingAcademicYear.name}`}
+          description="This will permanently remove this academic year."
+          confirmLabel="Delete"
+          variant="danger"
+          isLoading={deleteAcademicYear.isPending}
         />
       )}
 

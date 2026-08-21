@@ -16,7 +16,7 @@ export function FeesTable({
   data: FeeRecord[];
   isLoading?: boolean;
   onView: (row: FeeRecord) => void;
-  onPay: (row: FeeRecord) => void;
+  onPay?: (row: FeeRecord) => void;
 }) {
   const columns: TableColumn<FeeRecord>[] = [
     { key: 'receiptNo', header: 'Receipt/ID', render: (_, r) => <span className="font-mono text-xs text-primary">{r.receiptNo ?? r.id}</span> },
@@ -55,7 +55,7 @@ export function FeesTable({
           <Button size="icon-sm" variant="ghost" onClick={() => onView(row)} title="View">
             <Eye className="h-4 w-4" />
           </Button>
-          {row.status !== 'paid' && (
+          {row.status !== 'paid' && onPay && (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onPay(row)}>
               <CreditCard className="h-3 w-3 mr-1" /> Pay Now
             </Button>

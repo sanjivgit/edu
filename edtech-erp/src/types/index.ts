@@ -11,6 +11,8 @@ export interface User {
   tenantId: string;
   permissions: string[];
   meta?: Record<string, unknown>;
+  studentId?: string | null;
+  teacherId?: string | null;
 }
 
 export interface AuthState {

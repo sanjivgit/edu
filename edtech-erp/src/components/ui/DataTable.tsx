@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './Button';
 import { Input } from './Input';
 import { TableSkeleton } from './Skeleton';
-import type { TableColumn, TableState } from '@/types';
+import type { TableColumn } from '@/types';
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/config/modules.config';
 
 interface DataTableProps<T extends object> {
@@ -12,7 +12,6 @@ interface DataTableProps<T extends object> {
   data: T[];
   total: number;
   isLoading?: boolean;
-  onStateChange?: (state: TableState) => void;
   keyField?: keyof T;
   searchPlaceholder?: string;
   actions?: (row: T) => React.ReactNode;
@@ -22,14 +21,14 @@ interface DataTableProps<T extends object> {
   className?: string;
   rowClassName?: (row: T) => string;
   onRowClick?: (row: T) => void;
+  filterBar?: React.ReactNode;
 }
 
 export function DataTable<T extends object>({
   columns,
   data,
-  total,
+  total: _total,
   isLoading = false,
-  onStateChange,
   keyField = 'id' as keyof T,
   searchPlaceholder = 'Search...',
   actions,
@@ -38,47 +37,73 @@ export function DataTable<T extends object>({
   className,
   rowClassName,
   onRowClick,
+  filterBar,
 }: DataTableProps<T>) {
-  const [state, setState] = useState<TableState>({
-    page: 1,
-    limit: DEFAULT_PAGE_SIZE,
-    search: '',
-    sortBy: '',
-    sortOrder: 'asc',
-    filters: {},
-  });
-
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
   const [searchInput, setSearchInput] = useState('');
-
-  const updateState = useCallback(
-    (updates: Partial<TableState>) => {
-      const next = { ...state, ...updates };
-      setState(next);
-      onStateChange?.(next);
-    },
-    [state, onStateChange]
-  );
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const handleSort = useCallback(
     (key: string) => {
-      if (state.sortBy === key) {
-        updateState({ sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc', page: 1 });
+      if (sortBy === key) {
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
       } else {
-        updateState({ sortBy: key, sortOrder: 'asc', page: 1 });
+        setSortBy(key);
+        setSortOrder('asc');
       }
+      setPage(1);
     },
-    [state, updateState]
+    [sortBy, sortOrder]
   );
 
   const handleSearch = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      updateState({ search: searchInput, page: 1 });
+      setSearch(searchInput);
+      setPage(1);
     },
-    [searchInput, updateState]
+    [searchInput]
   );
 
-  const totalPages = useMemo(() => Math.ceil(total / state.limit), [total, state.limit]);
+  const processedData = useMemo(() => {
+    let result = [...data];
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((row) =>
+        columns.some((col) => {
+          const val = row[col.key as keyof T];
+          if (val == null) return false;
+          return String(val).toLowerCase().includes(q);
+        })
+      );
+    }
+
+    if (sortBy) {
+      result.sort((a, b) => {
+        const aVal = a[sortBy as keyof T];
+        const bVal = b[sortBy as keyof T];
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return sortOrder === 'asc' ? -1 : 1;
+        if (bVal == null) return sortOrder === 'asc' ? 1 : -1;
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        const cmp = String(aVal).localeCompare(String(bVal));
+        return sortOrder === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [data, search, sortBy, sortOrder, columns]);
+
+  const filteredTotal = processedData.length;
+  const totalPages = Math.max(1, Math.ceil(filteredTotal / limit));
+  const safePage = Math.min(page, totalPages);
+  const pagedData = processedData.slice((safePage - 1) * limit, safePage * limit);
 
   const renderCell = (col: TableColumn<T>, row: T): React.ReactNode => {
     if (col.render) return col.render(row[col.key as keyof T], row);
@@ -88,15 +113,14 @@ export function DataTable<T extends object>({
   };
 
   const SortIcon = ({ colKey }: { colKey: string }) => {
-    if (state.sortBy !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />;
-    return state.sortOrder === 'asc'
+    if (sortBy !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 opacity-40" />;
+    return sortOrder === 'asc'
       ? <ChevronUp className="h-3.5 w-3.5 text-primary" />
       : <ChevronDown className="h-3.5 w-3.5 text-primary" />;
   };
 
   return (
     <div className={cn('bg-card border border-border rounded-xl overflow-hidden', className)}>
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-5 py-4 border-b border-border">
         <form onSubmit={handleSearch} className="flex items-center gap-2 w-full sm:max-w-xs">
           <Input
@@ -111,12 +135,10 @@ export function DataTable<T extends object>({
           </Button>
         </form>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" leftIcon={<SlidersHorizontal className="h-3.5 w-3.5" />}>
-            Filter
-          </Button>
+          {filterBar}
           <select
-            value={state.limit}
-            onChange={(e) => updateState({ limit: Number(e.target.value), page: 1 })}
+            value={limit}
+            onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
             className="h-8 rounded-md border border-input bg-background px-2 text-xs font-body focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {PAGE_SIZE_OPTIONS.map((s) => (
@@ -126,11 +148,10 @@ export function DataTable<T extends object>({
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto scrollbar-thin">
         {isLoading ? (
           <div className="p-6">
-            <TableSkeleton rows={state.limit} cols={columns.length + (actions ? 1 : 0)} />
+            <TableSkeleton rows={limit} cols={columns.length + (actions ? 1 : 0)} />
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -162,7 +183,7 @@ export function DataTable<T extends object>({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.length === 0 ? (
+              {pagedData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={columns.length + (actions ? 1 : 0)}
@@ -175,7 +196,7 @@ export function DataTable<T extends object>({
                   </td>
                 </tr>
               ) : (
-                data.map((row, rowIdx) => (
+                pagedData.map((row, rowIdx) => (
                   <tr
                     key={String(row[keyField]) ?? rowIdx}
                     className={cn(
@@ -213,34 +234,33 @@ export function DataTable<T extends object>({
         )}
       </div>
 
-      {/* Pagination */}
-      {!isLoading && data.length > 0 && (
+      {!isLoading && pagedData.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3 border-t border-border bg-muted/20">
           <p className="text-xs text-muted-foreground">
             Showing{' '}
             <span className="font-medium text-foreground">
-              {(state.page - 1) * state.limit + 1}–
-              {Math.min(state.page * state.limit, total)}
+              {(safePage - 1) * limit + 1}–
+              {Math.min(safePage * limit, filteredTotal)}
             </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> results
+            of <span className="font-medium text-foreground">{filteredTotal}</span> results
           </p>
           <div className="flex items-center gap-1">
             <Button
               size="icon-sm"
               variant="outline"
-              onClick={() => updateState({ page: Math.max(1, state.page - 1) })}
-              disabled={state.page === 1}
+              onClick={() => setPage(Math.max(1, safePage - 1))}
+              disabled={safePage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const pageNum = Math.max(1, Math.min(state.page - 2, totalPages - 4)) + i;
+              const pageNum = Math.max(1, Math.min(safePage - 2, totalPages - 4)) + i;
               return (
                 <Button
                   key={pageNum}
                   size="icon-sm"
-                  variant={pageNum === state.page ? 'default' : 'outline'}
-                  onClick={() => updateState({ page: pageNum })}
+                  variant={pageNum === safePage ? 'default' : 'outline'}
+                  onClick={() => setPage(pageNum)}
                 >
                   {pageNum}
                 </Button>
@@ -249,8 +269,8 @@ export function DataTable<T extends object>({
             <Button
               size="icon-sm"
               variant="outline"
-              onClick={() => updateState({ page: Math.min(totalPages, state.page + 1) })}
-              disabled={state.page >= totalPages}
+              onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+              disabled={safePage >= totalPages}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

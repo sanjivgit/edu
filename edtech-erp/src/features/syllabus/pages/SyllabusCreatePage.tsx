@@ -18,6 +18,7 @@ export default function SyllabusCreatePage() {
         classId: values.classId,
         section: values.section,
         subject: values.subject,
+        academicYearId: (values as any).academicYearId ?? null,
         term: values.term,
         description: values.description ?? '',
         attachments,

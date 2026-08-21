@@ -37,6 +37,10 @@ export class CreateSyllabusDto {
   @IsOptional()
   @IsEnum(SyllabusStatus)
   status?: SyllabusStatus;
+
+  @IsOptional()
+  @IsString()
+  academicYearId?: string;
 }
 
 export class UpdateSyllabusDto extends CreateSyllabusDto {}

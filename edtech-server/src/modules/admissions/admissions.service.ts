@@ -33,6 +33,7 @@ export class AdmissionsService {
           : { appliedDate: 'desc' },
         skip,
         take: limit,
+        include: { academicYear: true },
       }),
     ]);
 
@@ -43,7 +44,7 @@ export class AdmissionsService {
   }
 
   async findOne(id: string) {
-    const admission = await this.prisma.admission.findUnique({ where: { id } });
+    const admission = await this.prisma.admission.findUnique({ where: { id }, include: { academicYear: true } });
     if (!admission) throw new NotFoundException('Admission application not found');
     return admission;
   }
@@ -61,6 +62,7 @@ export class AdmissionsService {
       data: {
         ...rest,
         tenantId: tenantId ?? undefined,
+        academicYearId: dto.academicYearId ?? undefined,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
         appliedDate: new Date(),
       },
@@ -73,6 +75,7 @@ export class AdmissionsService {
       where: { id },
       data: {
         ...dto,
+        academicYearId: dto.academicYearId ?? undefined,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
       },
     });

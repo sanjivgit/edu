@@ -96,9 +96,9 @@ export const useGetRoutes = () =>
     queryKey: [API, 'routes'],
     queryFn: async () => {
       const res = await apiClient
-        .get<ApiResponse<{ items: BackendRoute[] }>>('/transport/routes', { params: { limit: 500 } })
+        .get<ApiResponse<BackendRoute[]>>('/transport/routes', { params: { limit: 500 } })
         .then(unwrapApi);
-      return (res?.items ?? []).map(toTransportRoute).sort((a, b) => a.name.localeCompare(b.name));
+      return (res ?? []).map(toTransportRoute).sort((a, b) => a.name.localeCompare(b.name));
     },
   });
 

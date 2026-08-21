@@ -23,7 +23,7 @@ export class SyllabusService {
       this.prisma.syllabus.count({ where }),
       this.prisma.syllabus.findMany({
         where,
-        include: { subject: true, class_: true },
+        include: { subject: true, class_: true, academicYear: true },
         orderBy: query.sortBy ? { [query.sortBy]: query.sortOrder } : { createdAt: 'desc' },
         skip,
         take: limit,
@@ -54,7 +54,7 @@ export class SyllabusService {
   async findOne(id: string) {
     const syllabus = await this.prisma.syllabus.findUnique({
       where: { id },
-      include: { subject: true, class_: true },
+      include: { subject: true, class_: true, academicYear: true },
     });
     if (!syllabus) throw new NotFoundException('Syllabus entry not found');
     return syllabus;
@@ -72,6 +72,7 @@ export class SyllabusService {
         attachments: dto.attachments ? (dto.attachments as any) : [],
         progress: dto.progress ?? 0,
         status: dto.status ?? 'draft',
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }
@@ -90,6 +91,7 @@ export class SyllabusService {
         attachments: dto.attachments ? (dto.attachments as any) : undefined,
         progress: dto.progress,
         status: dto.status,
+        academicYearId: dto.academicYearId ?? undefined,
       },
     });
   }
