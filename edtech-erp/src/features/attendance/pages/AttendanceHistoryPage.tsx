@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Filter, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/hooks';
 import { AttendanceSessionsTable } from '../components/AttendanceSessionsTable';
 import { useGetSessions, type AttendanceSession } from '../services/attendance.service';
 
@@ -33,6 +34,7 @@ function exportCsv(data: AttendanceSession[]) {
 
 export default function AttendanceHistoryPage() {
   const navigate = useNavigate();
+  const { isTeachingStaff } = useAuth();
   const sessionsQuery = useGetSessions();
   const sessions = sessionsQuery.data ?? [];
 
@@ -64,15 +66,19 @@ export default function AttendanceHistoryPage() {
     <div className="space-y-6">
       <PageHeader
         title="Attendance History"
-        description="Previously saved attendance sessions"
+        description={isTeachingStaff ? 'Previously saved attendance sessions' : 'View attendance records'}
         actions={
           <>
-            <Button variant="outline" size="sm" leftIcon={<Download className="h-4 w-4" />} onClick={() => exportCsv(filtered)}>
-              Export
-            </Button>
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/attendance')}>
-              Back to Marking
-            </Button>
+            {isTeachingStaff && (
+              <Button variant="outline" size="sm" leftIcon={<Download className="h-4 w-4" />} onClick={() => exportCsv(filtered)}>
+                Export
+              </Button>
+            )}
+            {isTeachingStaff && (
+              <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/attendance')}>
+                Back to Marking
+              </Button>
+            )}
           </>
         }
       />

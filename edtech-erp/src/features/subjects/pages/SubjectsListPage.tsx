@@ -21,8 +21,7 @@ const CATEGORY_OPTIONS: { value: SubjectCategory; label: string }[] = [
 
 export default function SubjectsListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isManagement } = useAuth();
   const listQuery = useGetSubjects();
   const deleteMutation = useDeleteSubject();
   const allData = listQuery.data ?? [];
@@ -55,12 +54,14 @@ export default function SubjectsListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Subject Management"
-        description="Manage subjects and curriculum"
+        title={isManagement ? 'Subject Management' : 'Subjects'}
+        description={isManagement ? 'Manage subjects and curriculum' : 'View subjects and curriculum'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/subjects/create')} disabled={!canEdit}>
-            Add Subject
-          </Button>
+          isManagement ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/subjects/create')}>
+              Add Subject
+            </Button>
+          ) : undefined
         }
       />
 
@@ -102,8 +103,8 @@ export default function SubjectsListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/subjects/${row.id}`)}
-        onEdit={canEdit ? (row) => navigate(`/subjects/${row.id}/edit`) : undefined}
-        onDelete={canEdit ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isManagement ? (row) => navigate(`/subjects/${row.id}/edit`) : undefined}
+        onDelete={isManagement ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

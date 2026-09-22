@@ -13,8 +13,7 @@ import { useGetTimetable } from '../services/timetable.service';
 import type { TimetableAssignPayload } from '../validations/timetable.schema';
 
 export default function TimetableListPage() {
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
+  const { isManagement } = useAuth();
   const { success } = useToast();
   const { classId: cls, section: sec, week, setClassId: setCls, setSection: setSec, setWeek } = useTimetableFilters();
   const [editingCell, setEditingCell] = useState<TimetableAssignPayload | null>(null);
@@ -25,15 +24,17 @@ export default function TimetableListPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Timetable Management"
-        description="View and manage class schedules and period assignments"
+        title={isManagement ? 'Timetable Management' : 'Timetable'}
+        description={isManagement ? 'View and manage class schedules and period assignments' : 'View class schedules'}
         actions={
-          <>
-            <Button variant="outline" size="sm" leftIcon={<Download className="h-4 w-4" />} onClick={() => success('Export', 'PDF export started')} disabled={!canEdit}>
-              Export PDF
-            </Button>
-            {canEdit ? <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setEditingCell({ classId: cls, section: sec, week, day: 'Monday', periodId: 1, subject: '', teacher: '' })}>Quick Edit</Button> : undefined}
-          </>
+          isManagement ? (
+            <>
+              <Button variant="outline" size="sm" leftIcon={<Download className="h-4 w-4" />} onClick={() => success('Export', 'PDF export started')}>
+                Export PDF
+              </Button>
+              <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setEditingCell({ classId: cls, section: sec, week, day: 'Monday', periodId: 1, subject: '', teacher: '' })}>Quick Edit</Button>
+            </>
+          ) : undefined
         }
       />
 
@@ -71,7 +72,7 @@ export default function TimetableListPage() {
       <TimetableGrid
         record={record}
         onCellClick={({ day, periodId, subject, teacher, isEmpty }) => {
-          if (!canEdit) {
+          if (!isManagement) {
             if (!isEmpty) success('Period', `${subject} — ${teacher}`);
             return;
           }

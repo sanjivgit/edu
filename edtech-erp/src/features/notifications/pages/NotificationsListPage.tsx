@@ -8,8 +8,7 @@ import { useDeleteNotification, useGetNotifications, useSendNowNotification } fr
 
 export default function NotificationsListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canManage = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const listQuery = useGetNotifications();
   const sendNowMutation = useSendNowNotification();
   const deleteMutation = useDeleteNotification();
@@ -18,12 +17,14 @@ export default function NotificationsListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Notification Center"
-        description="View all system notifications"
+        title="Notifications"
+        description={isTeachingStaff ? 'Create and send notifications' : 'View your notifications'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/notifications/create')} disabled={!canManage}>
-            Create Notification
-          </Button>
+          isTeachingStaff ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/notifications/create')}>
+              Create Notification
+            </Button>
+          ) : undefined
         }
       />
 
@@ -31,9 +32,9 @@ export default function NotificationsListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/notifications/${row.id}`)}
-        onEdit={canManage ? (row) => navigate(`/notifications/${row.id}/edit`) : undefined}
-        onSendNow={canManage ? (row) => sendNowMutation.mutate({ id: row.id }) : undefined}
-        onDelete={canManage ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isTeachingStaff ? (row) => navigate(`/notifications/${row.id}/edit`) : undefined}
+        onSendNow={isTeachingStaff ? (row) => sendNowMutation.mutate({ id: row.id }) : undefined}
+        onDelete={isTeachingStaff ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

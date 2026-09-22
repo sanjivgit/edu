@@ -15,8 +15,7 @@ const STATUS_OPTIONS = ['draft', 'assigned', 'closed'] as const;
 
 export default function HomeworkListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const listQuery = useGetHomework();
   const deleteMutation = useDeleteHomework();
   const { data: academicYears = [] } = useGetAcademicYears();
@@ -54,12 +53,14 @@ export default function HomeworkListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Homework Management"
-        description="Assign and track student homework"
+        title={isTeachingStaff ? 'Homework Management' : 'Homework'}
+        description={isTeachingStaff ? 'Assign and track student homework' : 'View assigned homework'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/homework/create')} disabled={!canEdit}>
-            Create Homework
-          </Button>
+          isTeachingStaff ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/homework/create')}>
+              Create Homework
+            </Button>
+          ) : undefined
         }
       />
 
@@ -125,8 +126,8 @@ export default function HomeworkListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/homework/${row.id}`)}
-        onEdit={canEdit ? (row) => navigate(`/homework/${row.id}/edit`) : undefined}
-        onDelete={canEdit ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isTeachingStaff ? (row) => navigate(`/homework/${row.id}/edit`) : undefined}
+        onDelete={isTeachingStaff ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

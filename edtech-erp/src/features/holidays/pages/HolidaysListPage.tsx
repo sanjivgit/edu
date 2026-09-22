@@ -10,8 +10,7 @@ import { useDeleteHoliday, useGetHolidays } from '../services/holidays.service';
 
 export default function HolidaysListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
+  const { isManagement } = useAuth();
   const [view, setView] = useState<'calendar' | 'table'>('calendar');
   const listQuery = useGetHolidays();
   const deleteMutation = useDeleteHoliday();
@@ -20,8 +19,8 @@ export default function HolidaysListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Holiday Management"
-        description="Manage yearly holiday calendar and school events"
+        title="Holidays"
+        description={isManagement ? 'Manage yearly holiday calendar and school events' : 'View the school holiday calendar'}
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant={view === 'calendar' ? 'default' : 'outline'} leftIcon={<CalendarDays className="h-4 w-4" />} onClick={() => setView('calendar')}>
@@ -30,7 +29,7 @@ export default function HolidaysListPage() {
             <Button size="sm" variant={view === 'table' ? 'default' : 'outline'} onClick={() => setView('table')}>
               Table
             </Button>
-            {canEdit ? <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/holidays/create')}>Add Holiday</Button> : null}
+            {isManagement ? <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/holidays/create')}>Add Holiday</Button> : null}
           </div>
         }
       />
@@ -42,8 +41,8 @@ export default function HolidaysListPage() {
           data={data}
           isLoading={listQuery.isLoading}
           onView={(row) => navigate(`/holidays/${row.id}`)}
-          onEdit={(row) => canEdit && navigate(`/holidays/${row.id}/edit`)}
-          onDelete={(row) => canEdit && deleteMutation.mutate({ id: row.id })}
+          onEdit={isManagement ? (row) => navigate(`/holidays/${row.id}/edit`) : undefined}
+          onDelete={isManagement ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
         />
       )}
     </div>

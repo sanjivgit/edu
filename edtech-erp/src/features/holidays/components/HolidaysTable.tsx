@@ -22,8 +22,8 @@ export function HolidaysTable({
   data: HolidayRecord[];
   isLoading?: boolean;
   onView: (row: HolidayRecord) => void;
-  onEdit: (row: HolidayRecord) => void;
-  onDelete: (row: HolidayRecord) => void;
+  onEdit?: (row: HolidayRecord) => void;
+  onDelete?: (row: HolidayRecord) => void;
 }) {
   const columns: TableColumn<HolidayRecord>[] = [
     { key: 'title', header: 'Holiday / Event', sortable: true },
@@ -46,12 +46,16 @@ export function HolidaysTable({
           <Button size="icon-sm" variant="ghost" onClick={() => onView(row)} title="View">
             <Eye className="h-4 w-4" />
           </Button>
-          <Button size="icon-sm" variant="ghost" onClick={() => onEdit(row)} title="Edit">
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button size="icon-sm" variant="ghost" onClick={() => onDelete(row)} title="Delete">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {onEdit && (
+            <Button size="icon-sm" variant="ghost" onClick={() => onEdit(row)} title="Edit">
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button size="icon-sm" variant="ghost" onClick={() => onDelete(row)} title="Delete">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       )}
     />

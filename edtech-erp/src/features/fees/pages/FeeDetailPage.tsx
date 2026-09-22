@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 import { formatCurrency } from '@/utils';
-import { useAuth, useToast } from '@/hooks';
+import { useToast } from '@/hooks';
 import { useGetStudentPaymentHistory, useRecordDirectPayment, type PaymentHistoryItem, type StudentPaymentHistory } from '../services/fees.service';
 
 declare global {
@@ -86,7 +86,6 @@ export default function FeeDetailPage() {
   const navigate = useNavigate();
   const { id: studentId } = useParams();
   const { success, error: showError } = useToast();
-  const { isManagement, isParent, isStudent } = useAuth();
   const historyQuery = useGetStudentPaymentHistory(studentId ?? '');
   const recordPaymentMutation = useRecordDirectPayment();
 
@@ -297,14 +296,9 @@ export default function FeeDetailPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold">{formatCurrency(fee.amount)}</span>
-                  {(isManagement || isParent) && (
-                    <Button size="sm" leftIcon={<CreditCard className="h-3.5 w-3.5" />} onClick={() => openPayModal(fee)}>
-                      {isParent ? 'Pay Now' : 'Record Payment'}
-                    </Button>
-                  )}
-                  {isStudent && (
-                    <span className="text-xs text-muted-foreground">Contact admin to pay</span>
-                  )}
+                  <Button size="sm" leftIcon={<CreditCard className="h-3.5 w-3.5" />} onClick={() => openPayModal(fee)}>
+                    Record Payment
+                  </Button>
                 </div>
               </div>
             ))}
@@ -369,22 +363,12 @@ export default function FeeDetailPage() {
             <Button variant="outline" onClick={() => { setPayModalOpen(false); setPayingFee(null); }}>
               Cancel
             </Button>
-            {isManagement && payMethod === 'razorpay' && (
+            {payMethod === 'razorpay' && (
               <Button onClick={handleRazorpayPayment} isLoading={razorpayLoading || recordPaymentMutation.isPending} leftIcon={<CreditCard className="h-4 w-4" />}>
                 Record Online Payment
               </Button>
             )}
-            {isManagement && (payMethod === 'qr' || payMethod === 'upi') && (
-              <Button onClick={handleConfirmQrUpiPayment} leftIcon={<Share2 className="h-4 w-4" />}>
-                Generate Payment Link
-              </Button>
-            )}
-            {isParent && payMethod === 'razorpay' && (
-              <Button onClick={handleRazorpayPayment} isLoading={razorpayLoading || recordPaymentMutation.isPending} leftIcon={<CreditCard className="h-4 w-4" />}>
-                Pay with Razorpay
-              </Button>
-            )}
-            {isParent && (payMethod === 'qr' || payMethod === 'upi') && (
+            {(payMethod === 'qr' || payMethod === 'upi') && (
               <Button onClick={handleConfirmQrUpiPayment} leftIcon={<Share2 className="h-4 w-4" />}>
                 Generate Payment Link
               </Button>
@@ -433,30 +417,21 @@ export default function FeeDetailPage() {
           {/* Razorpay info */}
           {payMethod === 'razorpay' && (
             <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              {isParent
-                ? 'Opens Razorpay payment gateway \u2014 cards, netbanking, wallets, UPI all supported.'
-                : 'Opens Razorpay checkout to record an online payment from the parent/student.'
-              }
+              Opens Razorpay checkout to record an online payment from the parent.
             </div>
           )}
 
           {/* QR preview */}
           {payMethod === 'qr' && (
             <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              {isParent
-                ? 'Click "Generate Payment Link" to create a QR code. Scan it with any UPI app to pay.'
-                : 'Click "Generate Payment Link" to create a QR code. Download it and share with the parent/student to scan and pay.'
-              }
+              Click "Generate Payment Link" to create a QR code. Download it and share with the parent to scan and pay.
             </div>
           )}
 
           {/* UPI info */}
           {payMethod === 'upi' && (
             <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              {isParent
-                ? 'Click "Generate Payment Link" to get the UPI ID and payment link. Make a direct transfer using any UPI app.'
-                : 'Click "Generate Payment Link" to get the UPI ID and payment link. Share it with the parent/student to make a direct transfer.'
-              }
+              Click "Generate Payment Link" to get the UPI ID and payment link. Share it with the parent to make a direct transfer.
             </div>
           )}
         </div>
@@ -467,21 +442,19 @@ export default function FeeDetailPage() {
         isOpen={confirmModalOpen}
         onClose={() => { setConfirmModalOpen(false); setPayingFee(null); }}
         title="Payment Link Generated"
-        description={isParent ? 'Scan the QR code or use the UPI ID below to make payment.' : 'Share this with the parent/student. Once they pay, confirm below.'}
+        description="Share this with the parent. Once they pay, confirm below."
         footer={
           <>
             <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
               Close
             </Button>
-            {isManagement && (
-              <Button
-                onClick={() => handleRecordConfirmedPayment('online', `Paid via ${payMethod === 'qr' ? 'QR code' : 'UPI transfer'}`)}
-                isLoading={recordPaymentMutation.isPending}
-                leftIcon={<CheckCircle className="h-4 w-4" />}
-              >
-                Confirm Payment Received
-              </Button>
-            )}
+            <Button
+              onClick={() => handleRecordConfirmedPayment('online', `Paid via ${payMethod === 'qr' ? 'QR code' : 'UPI transfer'}`)}
+              isLoading={recordPaymentMutation.isPending}
+              leftIcon={<CheckCircle className="h-4 w-4" />}
+            >
+              Confirm Payment Received
+            </Button>
           </>
         }
       >
@@ -531,10 +504,7 @@ export default function FeeDetailPage() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            {isParent
-              ? 'After making payment, the admin will confirm and record your payment.'
-              : 'After the parent/student confirms payment, click "Confirm Payment Received" to record it.'
-            }
+            After the parent confirms payment, click "Confirm Payment Received" to record it.
           </p>
         </div>
       </Modal>

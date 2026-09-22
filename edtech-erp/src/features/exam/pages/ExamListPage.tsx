@@ -10,8 +10,7 @@ import { useDeleteExam, useGetExams } from '../services/exam.service';
 
 export default function ExamListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const listQuery = useGetExams();
   const deleteMutation = useDeleteExam();
   const { data: academicYears = [] } = useGetAcademicYears();
@@ -31,12 +30,14 @@ export default function ExamListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Exam Management"
-        description="Schedule and manage examinations"
+        title={isTeachingStaff ? 'Exam Management' : 'Exams'}
+        description={isTeachingStaff ? 'Schedule and manage examinations' : 'View exam schedule and details'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/exam/create')} disabled={!canEdit}>
-            Schedule Exam
-          </Button>
+          isTeachingStaff ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/exam/create')}>
+              Schedule Exam
+            </Button>
+          ) : undefined
         }
       />
 
@@ -56,8 +57,8 @@ export default function ExamListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/exam/${row.id}`)}
-        onEdit={canEdit ? (row) => navigate(`/exam/${row.id}/edit`) : undefined}
-        onDelete={canEdit ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isTeachingStaff ? (row) => navigate(`/exam/${row.id}/edit`) : undefined}
+        onDelete={isTeachingStaff ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

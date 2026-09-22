@@ -35,8 +35,7 @@ const EMPTY_FILTERS: Filters = { classId: '', section: '', subject: '', term: ''
 
 export default function SyllabusListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canManage = user?.role === 'superadmin' || user?.role === 'admin';
+  const { isManagement } = useAuth();
   const listQuery = useGetSyllabus();
   const deleteMutation = useDeleteSyllabus();
   const { data: academicYears = [] } = useGetAcademicYears();
@@ -67,12 +66,14 @@ export default function SyllabusListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Syllabus Management"
-        description="Manage course curriculum and syllabus"
+        title={isManagement ? 'Syllabus Management' : 'Syllabus'}
+        description={isManagement ? 'Manage course curriculum and syllabus' : 'View course curriculum and syllabus'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/syllabus/create')} disabled={!canManage}>
-            Add Syllabus
-          </Button>
+          isManagement ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/syllabus/create')}>
+              Add Syllabus
+            </Button>
+          ) : undefined
         }
       />
 
@@ -142,8 +143,8 @@ export default function SyllabusListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/syllabus/${row.id}`)}
-        onEdit={canManage ? (row) => navigate(`/syllabus/${row.id}/edit`) : undefined}
-        onDelete={canManage ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isManagement ? (row) => navigate(`/syllabus/${row.id}/edit`) : undefined}
+        onDelete={isManagement ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

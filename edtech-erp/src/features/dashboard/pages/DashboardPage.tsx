@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks';
 import { formatCurrency, formatRelativeTime } from '@/utils';
 import {
@@ -148,6 +149,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { user, isManagement, isStudent, isParent } = useAuth();
   const statsQuery = useDashboardStats(user?.role);
   const enrollmentQuery = useEnrollmentTrend();
@@ -216,13 +218,13 @@ export default function DashboardPage() {
             </div>
           ) : isStudent ? (
             <Button variant="outline" size="sm" leftIcon={<BookOpen className="h-4 w-4" />}
-              onClick={() => window.location.href = '/student/attendance'}>
+              onClick={() => navigate('/attendance/history')}>
               My Attendance
             </Button>
           ) : isParent ? (
             <Button variant="outline" size="sm" leftIcon={<Users className="h-4 w-4" />}
-              onClick={() => window.location.href = '/parent-portal'}>
-              View Children
+              onClick={() => navigate('/attendance/history')}>
+              View Attendance
             </Button>
           ) : null
         }
@@ -238,7 +240,7 @@ export default function DashboardPage() {
       {/* Student-specific quick actions */}
       {isStudent && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/attendance'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/attendance/history')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <UserCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -249,18 +251,18 @@ export default function DashboardPage() {
               </div>
             </div>
           </Card>
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/fees'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/homework')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <BookOpen className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-sm font-medium">My Fees</p>
-                <p className="text-xs text-muted-foreground">Check fee status & pay</p>
+                <p className="text-sm font-medium">Homework</p>
+                <p className="text-xs text-muted-foreground">View assigned homework</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/student/exams'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/exam')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
                 <BookOpen className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -277,29 +279,29 @@ export default function DashboardPage() {
       {/* Parent-specific quick actions */}
       {isParent && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/parent-portal'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/attendance/history')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
                 <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <p className="text-sm font-medium">My Children</p>
-                <p className="text-xs text-muted-foreground">View progress & details</p>
+                <p className="text-sm font-medium">Attendance</p>
+                <p className="text-xs text-muted-foreground">View your children's attendance</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/parent-portal/fees'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/parent-portal/fees')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                 <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
                 <p className="text-sm font-medium">Fee Payments</p>
-                <p className="text-xs text-muted-foreground">Pay fees online</p>
+                <p className="text-xs text-muted-foreground">History, overdue, and pay online</p>
               </div>
             </div>
           </Card>
-          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => window.location.href = '/notices'}>
+          <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/noticeboard')}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                 <Bell className="h-5 w-5 text-red-600 dark:text-red-400" />

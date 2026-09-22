@@ -7,7 +7,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { StatusBadge } from '@/components/ui/Badge';
 import type { TableColumn } from '@/types';
-import { useToast } from '@/hooks';
+import { useToast, useAuth } from '@/hooks';
 import { useGetClasses } from '@/features/classes/services/classes.service';
 import { LiveLectureFormModal } from '../components/LiveLectureFormModal';
 import {
@@ -23,6 +23,7 @@ import {
 
 export default function LiveLecturePage() {
   const { warning } = useToast();
+  const { isTeachingStaff } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<LiveLectureRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<LiveLectureRecord | null>(null);
@@ -102,16 +103,18 @@ export default function LiveLecturePage() {
         title="Live Classes"
         description="Join and host live learning sessions"
         actions={
-          <Button
-            size="sm"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => {
-              setEditing(null);
-              setModalOpen(true);
-            }}
-          >
-            Schedule Live Class
-          </Button>
+          isTeachingStaff ? (
+            <Button
+              size="sm"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => {
+                setEditing(null);
+                setModalOpen(true);
+              }}
+            >
+              Schedule Live Class
+            </Button>
+          ) : undefined
         }
       />
 
@@ -151,62 +154,70 @@ export default function LiveLecturePage() {
                 <ExternalLink className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              title="Edit"
-              onClick={(event) => {
-                event.stopPropagation();
-                setEditing(row);
-                setModalOpen(true);
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="text-destructive"
-              title="Delete"
-              onClick={(event) => {
-                event.stopPropagation();
-                setConfirmDelete(row);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {isTeachingStaff && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                title="Edit"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setEditing(row);
+                  setModalOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+            {isTeachingStaff && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="text-destructive"
+                title="Delete"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setConfirmDelete(row);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
       />
 
-      <LiveLectureFormModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditing(null);
-        }}
-        onSubmit={handleSubmit}
-        isSubmitting={(editing ? updateMutation : createMutation).isPending}
-        initial={editing}
-        classOptions={classOptions}
-      />
+      {isTeachingStaff && (
+        <>
+          <LiveLectureFormModal
+            isOpen={modalOpen}
+            onClose={() => {
+              setModalOpen(false);
+              setEditing(null);
+            }}
+            onSubmit={handleSubmit}
+            isSubmitting={(editing ? updateMutation : createMutation).isPending}
+            initial={editing}
+            classOptions={classOptions}
+          />
 
-      <ConfirmModal
-        isOpen={!!confirmDelete}
-        onClose={() => setConfirmDelete(null)}
-        onConfirm={() => {
-          if (!confirmDelete) return;
-          deleteMutation.mutate(
-            { id: confirmDelete.id },
-            { onSuccess: () => setConfirmDelete(null) }
-          );
-        }}
-        title="Delete Live Class"
-        description={`Are you sure you want to delete "${confirmDelete?.title}"?`}
-        confirmLabel="Delete"
-        variant="danger"
-        isLoading={deleteMutation.isPending}
-      />
+          <ConfirmModal
+            isOpen={!!confirmDelete}
+            onClose={() => setConfirmDelete(null)}
+            onConfirm={() => {
+              if (!confirmDelete) return;
+              deleteMutation.mutate(
+                { id: confirmDelete.id },
+                { onSuccess: () => setConfirmDelete(null) }
+              );
+            }}
+            title="Delete Live Class"
+            description={`Are you sure you want to delete "${confirmDelete?.title}"?`}
+            confirmLabel="Delete"
+            variant="danger"
+            isLoading={deleteMutation.isPending}
+          />
+        </>
+      )}
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <CalendarClock className="h-4 w-4" />

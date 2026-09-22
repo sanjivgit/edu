@@ -24,7 +24,7 @@ export default function AssessmentCreatePage() {
         academicYearId: values.academicYearId ?? null,
         status: 'published',
       },
-      { onSuccess: (created) => navigate(`/assessment/${created.id}`) }
+      { onSuccess: (created) => navigate(`/assessments/${created.id}`) }
     );
   };
 
@@ -34,7 +34,7 @@ export default function AssessmentCreatePage() {
         title="Create Assessment"
         description="Create a new assessment"
         actions={
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessment')}>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessments')}>
             Back
           </Button>
         }

@@ -4,12 +4,14 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
+import { useAuth } from '@/hooks';
 import { AssessmentResultsTable } from '../components/AssessmentResultsTable';
 import { useGetAssessmentById, useGetAssessmentResults } from '../services/assessment.service';
 
 export default function AssessmentDetailPage() {
   const navigate = useNavigate();
   const { assessmentId } = useParams();
+  const { isTeachingStaff } = useAuth();
   const detailQuery = useGetAssessmentById({ assessmentId });
   const assessment = detailQuery.data;
   const resultsQuery = useGetAssessmentResults({ assessmentId });
@@ -21,7 +23,7 @@ export default function AssessmentDetailPage() {
           title="Assessment Details"
           description="Assessment info and results"
           actions={
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessment')}>
+            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessments')}>
               Back
             </Button>
           }
@@ -40,12 +42,14 @@ export default function AssessmentDetailPage() {
         description="Assessment info and results"
         actions={
           <>
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessment')}>
+            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessments')}>
               Back
             </Button>
-            <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/assessment/${assessment.id}/edit`)}>
-              Edit
-            </Button>
+            {isTeachingStaff && (
+              <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/assessments/${assessment.id}/edit`)}>
+                Edit
+              </Button>
+            )}
           </>
         }
       />

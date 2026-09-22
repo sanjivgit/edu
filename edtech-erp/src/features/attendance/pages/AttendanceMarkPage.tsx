@@ -18,8 +18,7 @@ import {
 } from '../services/attendance.service';
 
 export default function AttendanceMarkPage() {
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const form = useForm<AttendanceFilterPayload>({
     resolver: yupResolver(attendanceFilterSchema),
     defaultValues: {
@@ -88,9 +87,11 @@ export default function AttendanceMarkPage() {
             <Button variant="outline" size="sm" leftIcon={<History className="h-4 w-4" />} asChild>
               <Link to="/attendance/history">History</Link>
             </Button>
-            <Button size="sm" leftIcon={<ClipboardCheck className="h-4 w-4" />} onClick={onSave} isLoading={saveMutation.isPending} disabled={!canEdit}>
-              Save Attendance
-            </Button>
+            {isTeachingStaff && (
+              <Button size="sm" leftIcon={<ClipboardCheck className="h-4 w-4" />} onClick={onSave} isLoading={saveMutation.isPending}>
+                Save Attendance
+              </Button>
+            )}
           </>
         }
       />
@@ -123,20 +124,22 @@ export default function AttendanceMarkPage() {
               className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => markAll('present')} disabled={!canEdit}>
-              Mark All Present
-            </Button>
-            <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => markAll('absent')} disabled={!canEdit}>
-              Mark All Absent
-            </Button>
-          </div>
+          {isTeachingStaff && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => markAll('present')}>
+                Mark All Present
+              </Button>
+              <Button size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => markAll('absent')}>
+                Mark All Absent
+              </Button>
+            </div>
+          )}
         </div>
 
         <AttendanceRosterTable
           students={students}
           attendance={attendance}
-          readOnly={!canEdit}
+          readOnly={!isTeachingStaff}
           onMark={(id, status) => setAttendance((prev) => ({ ...prev, [id]: status }))}
         />
       </Card>

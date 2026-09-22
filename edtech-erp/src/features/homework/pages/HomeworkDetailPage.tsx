@@ -10,8 +10,7 @@ import { useCloseHomework, useGetHomeworkById, useGetHomeworkSubmissions } from 
 
 export default function HomeworkDetailPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const { homeworkId } = useParams();
 
   const detailQuery = useGetHomeworkById({ homeworkId });
@@ -48,10 +47,10 @@ export default function HomeworkDetailPage() {
             <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/homework')}>
               Back
             </Button>
-            {canEdit ? <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/homework/${homework.id}/edit`)}>
+            {isTeachingStaff ? <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/homework/${homework.id}/edit`)}>
               Edit
             </Button> : null}
-            {canEdit && homework.status !== 'closed' && (
+            {isTeachingStaff && homework.status !== 'closed' && (
               <Button
                 size="sm"
                 variant="outline"

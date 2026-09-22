@@ -29,6 +29,10 @@ import {
   Settings,
   Package,
   Building2,
+  CalendarRange,
+  FileCheck,
+  Users,
+  Wallet,
   ChevronDown,
   ChevronRight,
   X,
@@ -72,6 +76,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
   Package,
   Building2,
+  CalendarRange,
+  FileCheck,
+  Users,
+  Wallet,
 };
 
 function NavItemComponent({

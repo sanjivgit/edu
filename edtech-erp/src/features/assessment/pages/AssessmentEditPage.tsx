@@ -21,7 +21,7 @@ export default function AssessmentEditPage() {
           title="Edit Assessment"
           description="Update assessment details"
           actions={
-            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessment')}>
+            <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/assessments')}>
               Back
             </Button>
           }
@@ -48,7 +48,7 @@ export default function AssessmentEditPage() {
         academicYearId: values.academicYearId ?? assessment.academicYearId ?? null,
         status: values.status ?? assessment.status,
       },
-      { onSuccess: (updated) => navigate(`/assessment/${updated.id}`) }
+      { onSuccess: (updated) => navigate(`/assessments/${updated.id}`) }
     );
   };
 
@@ -58,7 +58,7 @@ export default function AssessmentEditPage() {
         title="Edit Assessment"
         description="Update assessment details"
         actions={
-          <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate(`/assessment/${assessment.id}`)}>
+          <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate(`/assessments/${assessment.id}`)}>
             Back
           </Button>
         }

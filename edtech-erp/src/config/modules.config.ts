@@ -131,7 +131,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     label: 'Fee Management',
     icon: 'CreditCard',
     basePath: '/fees',
-    roles: ['superadmin', 'admin', 'parent'],
+    roles: ['superadmin', 'admin'],
     lazy: true,
   },
   {
@@ -256,7 +256,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: 'parent-portal',
-    label: 'My Children\'s Fees',
+    label: 'Fees',
     icon: 'Wallet',
     basePath: '/parent-portal/fees',
     roles: ['parent'],

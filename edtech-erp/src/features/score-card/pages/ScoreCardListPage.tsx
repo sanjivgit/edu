@@ -19,8 +19,7 @@ const TERM_LABEL: Record<string, string> = {
 
 export default function ScoreCardListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canManage = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { user, isTeachingStaff, isStudent } = useAuth();
 
   const examsQuery = useGetExams();
   const { data: academicYears = [] } = useGetAcademicYears();
@@ -49,7 +48,7 @@ export default function ScoreCardListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Score Cards"
-        description="Manage exam scores and publish results"
+        description={isTeachingStaff ? 'Manage exam scores and publish results' : 'View exam results'}
       />
 
       <DataTable
@@ -67,7 +66,7 @@ export default function ScoreCardListPage() {
           </select>
         }
         actions={(row) =>
-          canManage ? (
+          isTeachingStaff ? (
             <Button
               size="sm"
               variant="outline"
@@ -75,6 +74,14 @@ export default function ScoreCardListPage() {
               onClick={() => navigate(`/score-cards/exam/${row.id}`)}
             >
               Manage Scores
+            </Button>
+          ) : isStudent && user?.studentId ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/score-cards/student/${user.studentId}`)}
+            >
+              View Results
             </Button>
           ) : null
         }

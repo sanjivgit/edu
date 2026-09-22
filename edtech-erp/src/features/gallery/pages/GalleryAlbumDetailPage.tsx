@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/Badge';
 import { AddMediaForm } from '../components/AddMediaForm';
 import { MediaGrid } from '../components/MediaGrid';
+import { useAuth } from '@/hooks';
 import { useAddMediaToAlbum, useGetAlbumById, useGetMediaByAlbum } from '../services/gallery.service';
 import type { AddMediaPayload } from '../validations/gallery.schema';
 
@@ -19,6 +20,7 @@ const VIS_LABEL: Record<string, string> = {
 export default function GalleryAlbumDetailPage() {
   const navigate = useNavigate();
   const { albumId } = useParams();
+  const { isTeachingStaff } = useAuth();
   const albumQuery = useGetAlbumById({ albumId });
   const album = albumQuery.data;
   const mediaQuery = useGetMediaByAlbum({ albumId });
@@ -62,9 +64,11 @@ export default function GalleryAlbumDetailPage() {
             <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/gallery')}>
               Back
             </Button>
-            <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/gallery/albums/${album.id}/edit`)}>
-              Edit
-            </Button>
+            {isTeachingStaff && (
+              <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/gallery/albums/${album.id}/edit`)}>
+                Edit
+              </Button>
+            )}
           </>
         }
       />
@@ -88,7 +92,9 @@ export default function GalleryAlbumDetailPage() {
         </div>
       </Card>
 
-      <AddMediaForm albumId={album.id} onSubmit={onAdd} isSubmitting={addMutation.isPending} />
+      {isTeachingStaff && (
+        <AddMediaForm albumId={album.id} onSubmit={onAdd} isSubmitting={addMutation.isPending} />
+      )}
 
       <MediaGrid items={mediaQuery.data ?? []} isLoading={mediaQuery.isLoading} />
     </div>

@@ -8,8 +8,7 @@ import { useDeleteRoute, useGetRoutes } from '../services/transport.service';
 
 export default function TransportRoutesListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin';
+  const { isManagement } = useAuth();
   const listQuery = useGetRoutes();
   const deleteMutation = useDeleteRoute();
   const data = listQuery.data ?? [];
@@ -18,11 +17,13 @@ export default function TransportRoutesListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Transportation"
-        description="Manage school transport routes"
+        description={isManagement ? 'Manage school transport routes' : 'View school transport routes'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/transport/routes/create')} disabled={!canEdit}>
-            Add Route
-          </Button>
+          isManagement ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/transport/routes/create')}>
+              Add Route
+            </Button>
+          ) : undefined
         }
       />
 
@@ -30,8 +31,8 @@ export default function TransportRoutesListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/transport/routes/${row.id}`)}
-        onEdit={canEdit ? (row) => navigate(`/transport/routes/${row.id}/edit`) : undefined}
-        onDelete={canEdit ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isManagement ? (row) => navigate(`/transport/routes/${row.id}/edit`) : undefined}
+        onDelete={isManagement ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

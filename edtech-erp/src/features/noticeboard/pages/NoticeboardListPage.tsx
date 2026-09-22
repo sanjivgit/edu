@@ -8,8 +8,7 @@ import { useDeleteNotice, useGetNotices, usePublishNotice } from '../services/no
 
 export default function NoticeboardListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canManage = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const listQuery = useGetNotices();
   const publishMutation = usePublishNotice();
   const deleteMutation = useDeleteNotice();
@@ -19,11 +18,13 @@ export default function NoticeboardListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Noticeboard"
-        description="Post and manage school notices"
+        description={isTeachingStaff ? 'Post and manage school notices' : 'View school notices'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/noticeboard/create')} disabled={!canManage}>
-            Create Notice
-          </Button>
+          isTeachingStaff ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/noticeboard/create')}>
+              Create Notice
+            </Button>
+          ) : undefined
         }
       />
 
@@ -31,9 +32,9 @@ export default function NoticeboardListPage() {
         data={data}
         isLoading={listQuery.isLoading}
         onView={(row) => navigate(`/noticeboard/${row.id}`)}
-        onEdit={canManage ? (row) => navigate(`/noticeboard/${row.id}/edit`) : undefined}
-        onPublish={canManage ? (row) => publishMutation.mutate({ id: row.id }) : undefined}
-        onDelete={canManage ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onEdit={isTeachingStaff ? (row) => navigate(`/noticeboard/${row.id}/edit`) : undefined}
+        onPublish={isTeachingStaff ? (row) => publishMutation.mutate({ id: row.id }) : undefined}
+        onDelete={isTeachingStaff ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

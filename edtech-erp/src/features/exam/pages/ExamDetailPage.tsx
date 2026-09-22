@@ -18,7 +18,7 @@ const TERM_LABEL: Record<string, string> = {
 export default function ExamDetailPage() {
   const navigate = useNavigate();
   const { examId } = useParams();
-  const { isManagement } = useAuth();
+  const { isTeachingStaff } = useAuth();
   const detailQuery = useGetExamById({ examId });
   const exam = detailQuery.data;
   const resultsQuery = useGetExamResults({ examId });
@@ -52,7 +52,7 @@ export default function ExamDetailPage() {
             <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/exam')}>
               Back
             </Button>
-            {isManagement && (
+            {isTeachingStaff && (
               <Button size="sm" leftIcon={<Pencil className="h-4 w-4" />} onClick={() => navigate(`/exam/${exam.id}/edit`)}>
                 Edit
               </Button>

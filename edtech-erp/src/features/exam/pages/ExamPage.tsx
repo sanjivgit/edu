@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { RequireRole } from '@/components/shared/Guards';
+import { ACCESS } from '@/config/access';
 import ExamListPage from './ExamListPage';
 import ExamCreatePage from './ExamCreatePage';
 import ExamDetailPage from './ExamDetailPage';
@@ -9,9 +10,9 @@ export default function ExamPage() {
   return (
     <Routes>
       <Route index element={<ExamListPage />} />
-      <Route path="create" element={<RequireRole roles={['superadmin', 'admin', 'teacher']}><ExamCreatePage /></RequireRole>} />
+      <Route path="create" element={<RequireRole roles={[...ACCESS.manageExams]}><ExamCreatePage /></RequireRole>} />
       <Route path=":examId" element={<ExamDetailPage />} />
-      <Route path=":examId/edit" element={<RequireRole roles={['superadmin', 'admin', 'teacher']}><ExamEditPage /></RequireRole>} />
+      <Route path=":examId/edit" element={<RequireRole roles={[...ACCESS.manageExams]}><ExamEditPage /></RequireRole>} />
     </Routes>
   );
 }

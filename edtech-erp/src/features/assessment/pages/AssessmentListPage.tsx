@@ -19,8 +19,7 @@ const selectClass = 'h-8 rounded-md border border-input bg-background px-2 text-
 
 export default function AssessmentListPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const canEdit = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'teacher';
+  const { isTeachingStaff } = useAuth();
   const listQuery = useGetAssessments();
   const deleteMutation = useDeleteAssessment();
   const { data: academicYears = [] } = useGetAcademicYears();
@@ -59,12 +58,14 @@ export default function AssessmentListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Assessment Management"
-        description="Create and manage assessments"
+        title={isTeachingStaff ? 'Assessment Management' : 'Assessments'}
+        description={isTeachingStaff ? 'Create and manage assessments' : 'View your assessments'}
         actions={
-          <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/assessment/create')} disabled={!canEdit}>
-            Create Assessment
-          </Button>
+          isTeachingStaff ? (
+            <Button size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => navigate('/assessments/create')}>
+              Create Assessment
+            </Button>
+          ) : undefined
         }
       />
 
@@ -140,9 +141,9 @@ export default function AssessmentListPage() {
       <AssessmentsTable
         data={filteredData}
         isLoading={listQuery.isLoading}
-        onView={(row) => navigate(`/assessment/${row.id}`)}
-        onEdit={canEdit ? (row) => navigate(`/assessment/${row.id}/edit`) : undefined}
-        onDelete={canEdit ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
+        onView={(row) => navigate(`/assessments/${row.id}`)}
+        onEdit={isTeachingStaff ? (row) => navigate(`/assessments/${row.id}/edit`) : undefined}
+        onDelete={isTeachingStaff ? (row) => deleteMutation.mutate({ id: row.id }) : undefined}
       />
     </div>
   );

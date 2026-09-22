@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { RequireRole } from '@/components/shared/Guards';
+import { ACCESS } from '@/config/access';
 import SubjectsListPage from './SubjectsListPage';
 import SubjectsCreatePage from './SubjectsCreatePage';
 import SubjectsDetailPage from './SubjectsDetailPage';
@@ -9,9 +10,9 @@ export default function SubjectsPage() {
   return (
     <Routes>
       <Route index element={<SubjectsListPage />} />
-      <Route path="create" element={<RequireRole roles={['superadmin', 'admin', 'teacher']}><SubjectsCreatePage /></RequireRole>} />
+      <Route path="create" element={<RequireRole roles={[...ACCESS.manageSubjects]}><SubjectsCreatePage /></RequireRole>} />
       <Route path=":subjectId" element={<SubjectsDetailPage />} />
-      <Route path=":subjectId/edit" element={<RequireRole roles={['superadmin', 'admin', 'teacher']}><SubjectsEditPage /></RequireRole>} />
+      <Route path=":subjectId/edit" element={<RequireRole roles={[...ACCESS.manageSubjects]}><SubjectsEditPage /></RequireRole>} />
     </Routes>
   );
 }

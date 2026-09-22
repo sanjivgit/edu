@@ -6,7 +6,7 @@ import { DataTable } from '@/components/ui/DataTable';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { StatusBadge } from '@/components/ui/Badge';
 import type { TableColumn } from '@/types';
-import { useToast } from '@/hooks';
+import { useToast, useAuth } from '@/hooks';
 import {
   getAssetUrl,
   useDeleteRecordedLecture,
@@ -21,6 +21,7 @@ function formatClassDisplay(record: RecordedLectureRecord): string {
 
 export default function RecordedLecturePage() {
   const { warning } = useToast();
+  const { isTeachingStaff } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState<RecordedLectureRecord | null>(null);
 
   const lecturesQuery = useGetRecordedLectures();
@@ -80,18 +81,20 @@ export default function RecordedLecturePage() {
             >
               <PlayCircle className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="text-destructive"
-              title="Delete"
-              onClick={(event) => {
-                event.stopPropagation();
-                setConfirmDelete(row);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {isTeachingStaff && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="text-destructive"
+                title="Delete"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setConfirmDelete(row);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
       />

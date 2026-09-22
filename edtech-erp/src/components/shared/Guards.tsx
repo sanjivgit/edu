@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks';
 import type { UserRole } from '@/types';
+import { hasRoleAccess } from '@/config/access';
 import { PageError } from '@/components/shared/ErrorBoundary';
 
 // ─── Require Auth ───────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ interface RequireRoleProps {
 export function RequireRole({ children, roles, redirectTo = '/dashboard' }: RequireRoleProps) {
   const { user } = useAuth();
 
-  if (!user || !roles.includes(user.role)) {
+  if (!hasRoleAccess(user?.role, roles)) {
     if (redirectTo) return <Navigate to={redirectTo} replace />;
     return (
       <PageError
@@ -73,6 +74,19 @@ export function RequirePermission({
 
   if (!hasAccess) return null;
 
+  return <>{children}</>;
+}
+
+/** Hide UI (buttons, labels, actions) unless the current user has one of the roles. */
+export function Can({
+  roles,
+  children,
+}: {
+  roles: UserRole[];
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+  if (!hasRoleAccess(user?.role, roles)) return null;
   return <>{children}</>;
 }
 

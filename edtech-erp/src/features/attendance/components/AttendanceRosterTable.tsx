@@ -34,7 +34,9 @@ export function AttendanceRosterTable({
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Student</th>
               <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Roll No</th>
               <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mark</th>
+              {!readOnly && (
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mark</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -51,28 +53,30 @@ export function AttendanceRosterTable({
                 <td className="px-4 py-3 text-center">
                   <StatusBadge status={attendance[s.id] ?? 'present'} />
                 </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1.5">
-                    {(['present', 'absent', 'late'] as const).map((status) => (
-                      <button
-                        key={status}
-                        disabled={readOnly}
-                        onClick={() => onMark(s.id, status)}
-                        className={`h-8 px-3 rounded-md text-xs font-medium transition-all border ${
-                          (attendance[s.id] ?? 'present') === status
-                            ? status === 'present'
-                              ? 'bg-emerald-500 text-white border-emerald-500'
-                              : status === 'absent'
-                                ? 'bg-red-500 text-white border-red-500'
-                                : 'bg-amber-500 text-white border-amber-500'
-                            : 'border-border text-muted-foreground hover:border-primary hover:text-primary'
-                        }`}
-                      >
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </td>
+                {!readOnly && (
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-center gap-1.5">
+                      {(['present', 'absent', 'late'] as const).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => onMark(s.id, status)}
+                          className={`h-8 px-3 rounded-md text-xs font-medium transition-all border ${
+                            (attendance[s.id] ?? 'present') === status
+                              ? status === 'present'
+                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                : status === 'absent'
+                                  ? 'bg-red-500 text-white border-red-500'
+                                  : 'bg-amber-500 text-white border-amber-500'
+                              : 'border-border text-muted-foreground hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

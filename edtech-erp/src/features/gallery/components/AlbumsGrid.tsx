@@ -21,8 +21,8 @@ export function AlbumsGrid({
   data: AlbumRecord[];
   isLoading?: boolean;
   onView: (album: AlbumRecord) => void;
-  onEdit: (album: AlbumRecord) => void;
-  onDelete: (album: AlbumRecord) => void;
+  onEdit?: (album: AlbumRecord) => void;
+  onDelete?: (album: AlbumRecord) => void;
 }) {
   if (isLoading) {
     return (
@@ -51,12 +51,16 @@ export function AlbumsGrid({
               <Button size="icon-sm" variant="ghost" className="bg-background/80 hover:bg-background" onClick={() => onView(a)} title="View">
                 <Eye className="h-4 w-4" />
               </Button>
-              <Button size="icon-sm" variant="ghost" className="bg-background/80 hover:bg-background" onClick={() => onEdit(a)} title="Edit">
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button size="icon-sm" variant="ghost" className="bg-background/80 hover:bg-background" onClick={() => onDelete(a)} title="Delete">
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {onEdit && (
+                <Button size="icon-sm" variant="ghost" className="bg-background/80 hover:bg-background" onClick={() => onEdit(a)} title="Edit">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button size="icon-sm" variant="ghost" className="bg-background/80 hover:bg-background" onClick={() => onDelete(a)} title="Delete">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
           <div className="p-4">
